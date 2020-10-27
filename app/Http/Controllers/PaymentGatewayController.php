@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CreatePaymentGateway;
 use App\Models\PaymentGateway;
 use App\Models\PaymentGatewayType;
-use Illuminate\Http\Request;
 
 class PaymentGatewayController extends Controller
 {
@@ -15,7 +15,7 @@ class PaymentGatewayController extends Controller
         return view('dashboard', ['paymentGateways'=> $paymentGateways, 'paymentGatewayTypes'=> $paymentGatewayTypes]);
     }
 
-    public function store(Request $request)
+    public function store(CreatePaymentGateway $request)
     {
         PaymentGateway::create($request->all());
 

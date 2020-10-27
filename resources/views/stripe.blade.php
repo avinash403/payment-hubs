@@ -51,14 +51,14 @@
     $('.btn-block').click(function () {
         var amount = $('.amount').val();
         var handler = StripeCheckout.configure({
-            key: '{!! env('STRIPE_KEY') !!}',
+            key: '{!! $appId !!}',
             locale: 'auto',
             token: function (token) {
                 // You can access the token ID with `token.id`.
                 // Get the token ID to your server-side code for use.
                 $('#res_token').html(JSON.stringify(token));
                 $.ajax({
-                    url: '{{ url("payment-process") }}',
+                    url: '{{ route("payment.stripe.process", $appId) }}',
                     method: 'post',
                     data: {
                         tokenId: token.id,

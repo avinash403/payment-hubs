@@ -50,6 +50,7 @@
                 <th scope="col">#</th>
                 <th scope="col">App Id</th>
                 <th scope="col">App Secret</th>
+                <th scope="col">Created At</th>
                 <th scope="col">Actions</th>
             </tr>
             </thead>
@@ -60,9 +61,10 @@
                     <td>{{$gateway->id}}</td>
                     <td>{{$gateway->app_id}}</td>
                     <td>{{$gateway->app_secret}}</td>
+                    <td>{{$gateway->created_at->format('jS F Y g:i A')}}</td>
                     <td>
-                        <button class="btn btn-primary">Create Payment</button>
-                        <button class="btn btn-primary">Download Script</button>
+                        <a class="btn btn-primary" href="{!! route('payment.stripe.view', $gateway->app_id) !!}">Create Payment</a>
+                        <a class="btn btn-primary">Download Script</a>
                     </td>
                 </tr>
             @endforeach
@@ -72,3 +74,4 @@
 </div>
 </body>
 </html>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>

@@ -34,4 +34,15 @@ class PaymentGateway extends Model
         'app_secret',
         'payment_gateway_type_id',
     ];
+
+    /**
+     * Validation rules
+     * @internal same pattern can be used if there has to have different rules for different user roles
+     * @var string[]
+     */
+    public static $rules = [
+        'app_id'=>'required|unique:payment_gateways,app_id',
+        'app_secret'=>'required',
+        'payment_gateway_type_id'=>'required|exists:payment_gateway_types,id',
+    ];
 }

@@ -20,8 +20,8 @@ Route::get('/', function () {
 
 
 // passing either mysql Id in the url and based on that querying
-Route::get('stripe', [StripePaymentController::class, 'index']);
-Route::post('payment-process', [StripePaymentController::class, 'process']);
+Route::get('stripe/{appId}', [StripePaymentController::class, 'stripe'])->name('payment.stripe.view');
+Route::post('stripe/{appId}/payment-process', [StripePaymentController::class, 'process'])->name('payment.stripe.process');
 
 Route::get('dashboard', [PaymentGatewayController::class, 'index']);
 Route::post('payment-gateway', [PaymentGatewayController::class, 'store'])->name('payment-gateway');

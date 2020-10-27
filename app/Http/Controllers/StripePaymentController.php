@@ -2,23 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StripePayment;
+use App\Models\PaymentGateway;
 use Illuminate\Http\Request;
 use Stripe;
 
 class StripePaymentController extends Controller
 {
-    public function index()
+
+    public function stripe($appId)
     {
-        return view('stripe');
+        return view('stripe', compact('appId'));
     }
 
     /**
      * Sends payment request to stripe server
-     * @param Request $request
+     * @param StripePayment $request
+     * @param $appId
      * @return string
      */
-    public function process(Request $request)
+    public function process(StripePayment $request, $appId)
     {
+        // setting up secret key
+        $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
+
+        Stripe::setApiKey($appSecret);
+
         try{
             return Stripe::charges()->create([
                 'source' => $request->get('tokenId'),
@@ -36,6 +45,7 @@ class StripePaymentController extends Controller
                     ]
                 ]
             ]);
+
         } catch (\Exception $e) {
             return $e->getMessage();
         }
