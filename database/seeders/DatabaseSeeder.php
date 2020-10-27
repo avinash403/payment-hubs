@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
      */
     private function seedPaymentGatewayTypes()
     {
-        PaymentGatewayType::updateOrCreate(['name'=>'stripe']);
-        PaymentGatewayType::updateOrCreate(['name'=>'paypal']);
+        PaymentGatewayType::updateOrCreate(['name'=>'Stripe']);
+        PaymentGatewayType::updateOrCreate(['name'=>'Paypal']);
     }
 }

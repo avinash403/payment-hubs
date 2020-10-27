@@ -32,6 +32,6 @@ class PaymentGateway extends Model
     protected $fillable = [
         'app_id',
         'app_secret',
-        'type'
+        'payment_gateway_type_id',
     ];
 }

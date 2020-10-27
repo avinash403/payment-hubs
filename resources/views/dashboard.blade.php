@@ -11,32 +11,29 @@
 </head>
 <body>
 <div class="container">
-    <br><br>
+    <br>
+        @include('helpers.alert')
+    <br>
     <div class="row">
         <h1 class="col col-md-6">Payment Gateways</h1>
-        <div class="col col-md-6">
-            <button class="btn btn-primary mt-2">Create Paypal Payment Gateway</button>
-            <button class="btn btn-primary mt-2">Create Stripe Payment Gateway</button>
-        </div>
-        <hr>
     </div>
 
     <br><br>
 
         {!! Form::open(['route'=>'payment-gateway', 'method'=>'post', 'class'=>'form-group row']) !!}
         <div class="col col-md-4">
-            {!! Form::label('app_key', 'App Key') !!}
-            {!! Form::text('app_key', null, ['class'=>'form-control']) !!}
+            {!! Form::label('app_id', 'App Id') !!}
+            {!! Form::text('app_id', null, ['class'=>'form-control', 'required'=> true]) !!}
         </div>
 
         <div class="col col-md-4">
             {!! Form::label('app_secret', 'App Secret') !!}
-            {!! Form::password('app_secret', ['class'=>'form-control']) !!}
+            {!! Form::password('app_secret', ['class'=>'form-control', 'required'=> true]) !!}
         </div>
 
         <div class="col col-md-2">
-            {!! Form::label('app_secret', 'Payment Gateway') !!}
-            {!! Form::select('app_secret', ['paypal'=>'Paypal', 'stripe'=>'Stripe'], null, ['class'=>'form-control']) !!}
+            {!! Form::label('payment_gateway_type_id', 'Type') !!}
+            {!! Form::select('payment_gateway_type_id', $paymentGatewayTypes, null, ['class'=>'form-control']) !!}
         </div>
 
         <div class="col col-md-2">
@@ -51,17 +48,17 @@
             <thead>
             <tr>
                 <th scope="col">#</th>
-                <th scope="col">App Key</th>
+                <th scope="col">App Id</th>
                 <th scope="col">App Secret</th>
                 <th scope="col">Actions</th>
             </tr>
             </thead>
 
             <tbody>
-            @foreach($gateways as $gateway)
+            @foreach($paymentGateways as $gateway)
                 <tr>
                     <td>{{$gateway->id}}</td>
-                    <td>{{$gateway->app_key}}</td>
+                    <td>{{$gateway->app_id}}</td>
                     <td>{{$gateway->app_secret}}</td>
                     <td>
                         <button class="btn btn-primary">Create Payment</button>

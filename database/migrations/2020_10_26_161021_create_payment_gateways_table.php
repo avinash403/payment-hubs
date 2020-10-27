@@ -25,7 +25,7 @@ class CreatePaymentGatewaysTable extends Migration
 
             // app key will be used to figure out the client in "where" statement hence the index,
             // but secret will be just check against the app_key
-            $table->string('app_key')->index();
+            $table->string('app_id')->index();
             $table->string('app_secret');
             $table->timestamps();
         });
