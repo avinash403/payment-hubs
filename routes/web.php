@@ -1,7 +1,7 @@
 <?php
 
+use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\StripePaymentController;
-use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,5 +18,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+
+// passing either mysql Id in the url and based on that querying
 Route::get('stripe', [StripePaymentController::class, 'index']);
 Route::post('payment-process', [StripePaymentController::class, 'process']);
+
+Route::get('dashboard', [PaymentGatewayController::class, 'index']);
+Route::post('payment-gateway', [PaymentGatewayController::class, 'store'])->name('payment-gateway');
