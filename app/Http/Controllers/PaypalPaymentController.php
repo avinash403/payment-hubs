@@ -112,7 +112,7 @@ class PaypalPaymentController extends Controller
         Session::forget('paypal_payment_id');
 
         if (empty($request->input('PayerID')) || empty($request->input('token'))) {
-            return redirect(route('payment.paypal.view'))->with('error', 'Payment failed');
+            return redirect(route('payment.paypal.view', $appId))->with('error', 'Payment failed');
         }
 
         $payment = Payment::get($payment_id, $this->paypal);
@@ -124,10 +124,10 @@ class PaypalPaymentController extends Controller
         $result = $payment->execute($execution, $this->paypal);
 
         if ($result->getState() == 'approved') {
-            return redirect(route('payment.paypal.view'))->with('success', 'Payment success');
+            return redirect(route('payment.paypal.view', $appId))->with('success', 'Payment success');
         }
 
-        return redirect(route('payment.paypal.view'))->with('error', 'Payment failed');
+        return redirect(route('payment.paypal.view', $appId))->with('error', 'Payment failed');
     }
 
 

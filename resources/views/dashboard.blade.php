@@ -1,25 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Stripe Integration Experiment</title>
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
-</head>
-<body>
-<div class="container">
-    <br>
-        @include('helpers.alert')
-    <br>
-    <div class="row">
-        <h1 class="col col-md-6">Payment Gateways</h1>
-    </div>
+@extends('layout.base')
 
-    <br><br>
+@section('title')
+    Payment Gateway Experiment
+@endsection
 
+@section('content')
+        {{--    Form to create a payment gateway    --}}
         {!! Form::open(['route'=>'payment-gateway', 'method'=>'post', 'class'=>'form-group row']) !!}
         <div class="col col-md-4">
             {!! Form::label('app_id', 'App Id') !!}
@@ -43,6 +29,8 @@
         {!! Form::close() !!}
 
     <br><br>
+
+    {{--  Payment gateway table  --}}
     <div class="row">
         <table class="table">
             <thead>
@@ -58,27 +46,20 @@
             <tbody>
             @foreach($paymentGateways as $gateway)
                 <tr>
-                    <td>{{$gateway->type->name}}</td>
-
                     <td>
-                        <div class="key-wrapper">
-                            {{$gateway->app_id}}
-                        </div>
+                        {{$gateway->type->name}}
                     </td>
                     <td>
-                        <div class="key-wrapper">
-                            {{$gateway->app_secret}}
-                        </div>
+                        <div class="key-wrapper">{{$gateway->app_id}}</div>
                     </td>
-                    <td>{{$gateway->created_at->format('jS F Y g:i A')}}</td>
                     <td>
-
-                        @php
-                            $paymentUrl = $gateway->type->name === 'Paypal' ? route('payment.paypal.view', $gateway->app_id) : route('payment.stripe.view', $gateway->app_id);
-                        @endphp
-
-                        <a class="btn btn-primary m-1" href="{!! $paymentUrl !!}">Create Payment</a>
-
+                        <div class="key-wrapper">{{$gateway->app_secret}}</div>
+                    </td>
+                    <td>
+                        {{$gateway->created_at->format('jS F Y g:i A')}}
+                    </td>
+                    <td>
+                        <a class="btn btn-primary m-1" href="{!! $gateway->payment_url !!}">Create Payment</a>
                         <a class="btn btn-primary m-1" >Download Script</a>
                     </td>
                 </tr>
@@ -86,16 +67,4 @@
             </tbody>
         </table>
     </div>
-</div>
-</body>
-</html>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-
-<style>
-    .key-wrapper {
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        width: 300px;
-    }
-</style>
+@endsection

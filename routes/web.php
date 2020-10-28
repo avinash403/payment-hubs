@@ -28,4 +28,4 @@ Route::post('payment-gateway', [PaymentGatewayController::class, 'store'])->name
 
 Route::get('paypal/{appId}', [\App\Http\Controllers\PaypalPaymentController::class, 'paypal'])->name('payment.paypal.view');
 Route::post('paypal/{appId}/payment-process', [\App\Http\Controllers\PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
-Route::get('paypal/payment-status', [\App\Http\Controllers\PaypalPaymentController::class, 'getPaymentStatus'])->name('paypal.payment.status');
+Route::get('paypal/payment/status', [\App\Http\Controllers\PaypalPaymentController::class, 'getPaymentStatus'])->name('paypal.payment.status');

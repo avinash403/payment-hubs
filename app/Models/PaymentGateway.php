@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -26,6 +27,10 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|PaymentGateway whereUserId($value)
  * @property int|null $payment_gateway_type_id
  * @method static \Illuminate\Database\Eloquent\Builder|PaymentGateway wherePaymentGatewayTypeId($value)
+ * @property string $app_id
+ * @property-read string $payment_url
+ * @property-read \App\Models\PaymentGatewayType|null $type
+ * @method static \Illuminate\Database\Eloquent\Builder|PaymentGateway whereAppId($value)
  */
 class PaymentGateway extends Model
 {
@@ -49,5 +54,25 @@ class PaymentGateway extends Model
     public function type()
     {
         return $this->belongsTo(PaymentGatewayType::class, 'payment_gateway_type_id');
+    }
+
+    /**
+     * Gives the URL at which payment can be made
+     * @return string
+     * @throws Exception
+     * @internal currently only paypal and stripe is added to the list. In future, can scale it for more
+     */
+    public function getPaymentUrlAttribute()
+    {
+        switch ($this->type->name){
+            case 'Paypal':
+                return route('payment.paypal.view', $this->app_id);
+
+            case 'Stripe':
+                return route('payment.stripe.view', $this->app_id);
+
+            default:
+                throw new Exception(`Payment Gateway {$this->type->name} not support`);
+        }
     }
 }
