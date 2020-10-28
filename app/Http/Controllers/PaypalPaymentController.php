@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PaymentGateway;
 use Illuminate\Http\Request;
-use Mockery\Exception;
 use PayPal\Api\Amount;
 use PayPal\Api\Payer;
 use PayPal\Api\Payment;
@@ -11,25 +11,17 @@ use PayPal\Api\PaymentExecution;
 use PayPal\Api\RedirectUrls;
 use PayPal\Api\Transaction;
 use PayPal\Auth\OAuthTokenCredential;
+use PayPal\Exception\PayPalConnectionException;
 use PayPal\Rest\ApiContext;
 use Redirect;
 use Session;
 
 class PaypalPaymentController extends Controller
 {
-    private $_api_context;
-
-    public function __construct()
-    {
-        $paypal_conf = \Config::get('services.paypal');
-
-        $this->_api_context = new ApiContext(new OAuthTokenCredential(
-                $paypal_conf['client_id'],
-                $paypal_conf['secret'])
-        );
-        $this->_api_context->setConfig($paypal_conf['settings']);
-    }
-
+    /**
+     * @var ApiContext
+     */
+    private $paypal;
 
     /**
      * Gives Paypal view page
@@ -41,7 +33,6 @@ class PaypalPaymentController extends Controller
         return view('paypal', compact('appId'));
     }
 
-
     /**
      * @param $appId
      * @param Request $request
@@ -49,28 +40,22 @@ class PaypalPaymentController extends Controller
      */
     public function payWithPaypal($appId, Request $request)
     {
+        $this->setPaypalConfigObject($appId);
+
         $amountNumber = $request->input('amount');
 
         $payer = new Payer();
 
         $payer->setPaymentMethod('paypal');
 
-//        $item_1 = new Item();
-
-//        $item_1->setName('Item 1') /** item name **/
-//        ->setCurrency('USD')
-//            ->setQuantity(1)
-//            ->setPrice($request->get('amount')); /** unit price **/
-//        $item_list = new ItemList();
-//        $item_list->setItems(array($item_1));
-
         $amount = new Amount();
+
+        // todo: make currency configurable
         $amount->setCurrency('USD')
             ->setTotal($amountNumber);
 
         $transaction = new Transaction();
         $transaction->setAmount($amount)
-//            ->setItemList($item_list)
             ->setDescription('Your transaction description');
 
         $redirect_urls = new RedirectUrls();
@@ -84,16 +69,10 @@ class PaypalPaymentController extends Controller
             ->setTransactions(array($transaction));
 
         try {
-            $payment->create($this->_api_context);
-
-        } catch (Exception $ex) {
-            if (\Config::get('app.debug')) {
-                \Session::put('error', 'Connection timeout');
-                return Redirect::route('paywithpaypal');
-            } else {
-                \Session::put('error', 'Some error occur, sorry for inconvenient');
-                return Redirect::route('paywithpaypal');
-            }
+            $payment->create($this->paypal);
+        } catch (PayPalConnectionException $ex) {
+            dd($ex);
+            return redirect()->back()->with('error', $ex->getMessage());
         }
 
 
@@ -104,14 +83,16 @@ class PaypalPaymentController extends Controller
             }
         }
 
-        /** add payment ID to session **/
         Session::put('paypal_payment_id', $payment->getId());
+
+        Session::put('paypal_app_id', $appId);
+
         if (isset($redirect_url)) {
             /** redirect to paypal **/
             return Redirect::away($redirect_url);
         }
-        Session::put('error', 'Unknown error occurred');
-        return Redirect::route('paywithpaypal');
+
+        return redirect()->back()->with('error', 'Unknown error occurred');
     }
 
 
@@ -122,30 +103,50 @@ class PaypalPaymentController extends Controller
      */
     public function getPaymentStatus(Request $request)
     {
+        $appId = Session::get('paypal_app_id');
+
+        $this->setPaypalConfigObject($appId);
+
         $payment_id = Session::get('paypal_payment_id');
 
         Session::forget('paypal_payment_id');
 
         if (empty($request->input('PayerID')) || empty($request->input('token'))) {
-            Session::put('error', 'Payment failed');
-            return Redirect::route('/');
+            return redirect(route('payment.paypal.view'))->with('error', 'Payment failed');
         }
 
-        $payment = Payment::get($payment_id, $this->_api_context);
+        $payment = Payment::get($payment_id, $this->paypal);
 
         $execution = new PaymentExecution();
 
         $execution->setPayerId($request->input('PayerID'));/**Execute the payment **/
 
-        $result = $payment->execute($execution, $this->_api_context);
+        $result = $payment->execute($execution, $this->paypal);
 
         if ($result->getState() == 'approved') {
-            \Session::put('success', 'Payment success');
-            return Redirect::route('/');
+            return redirect(route('payment.paypal.view'))->with('success', 'Payment success');
         }
 
-        \Session::put('error', 'Payment failed');
+        return redirect(route('payment.paypal.view'))->with('error', 'Payment failed');
+    }
 
-        return Redirect::route('/');
+
+    /**
+     * Sets paypal ApiContext object with required configuration
+     * @param $appId
+     */
+    private function setPaypalConfigObject($appId)
+    {
+        $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
+
+        $this->paypal = new ApiContext(new OAuthTokenCredential($appId, $appSecret));
+
+        $this->paypal->setConfig([
+            'mode' => env('PAYPAL_MODE','sandbox'),
+            'http.ConnectionTimeOut' => 30,
+            'log.LogEnabled' => true,
+            'log.FileName' => storage_path() . '/logs/paypal.log',
+            'log.LogLevel' => 'ERROR'
+        ]);
     }
 }
