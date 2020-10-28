@@ -45,4 +45,9 @@ class PaymentGateway extends Model
         'app_secret'=>'required',
         'payment_gateway_type_id'=>'required|exists:payment_gateway_types,id',
     ];
+
+    public function type()
+    {
+        return $this->belongsTo(PaymentGatewayType::class, 'payment_gateway_type_id');
+    }
 }

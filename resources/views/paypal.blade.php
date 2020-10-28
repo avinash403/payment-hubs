@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Stripe Integration Experiment</title>
+    <title>Paypal Integration Experiment</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
@@ -15,7 +15,7 @@
 
         <div class="col-md-12 mt-2 mb-2">
             <br>
-            <h3 class="text-center">Stripe Integration Experiment</h3>
+            <h3 class="text-center">Paypal Integration Experiment</h3>
             <hr>
         </div>
         <div class="col-md-12 mt-2 mb-2">
@@ -25,11 +25,15 @@
     <div class="row">
         <div class="col-md-4 offset-md-4">
 
+            {!! Form::open(['route'=> ['payment.paypal.process', $appId], 'method'=> 'post']) !!}
             <div class="form-group">
+
                 <label class="label">Enter Amount</label>
                 <input type="text" name="amount" class="form-control amount">
             </div>
-            <button type="button" class="btn btn-primary btn-block">Pay</button>
+            <button type="submit" class="btn btn-primary btn-block">Pay</button>
+            {!! Form::close() !!}
+
         </div>
     </div>
 </div>

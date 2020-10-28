@@ -47,7 +47,7 @@
         <table class="table">
             <thead>
             <tr>
-                <th scope="col">#</th>
+                <th scope="col">Type</th>
                 <th scope="col">App Id</th>
                 <th scope="col">App Secret</th>
                 <th scope="col">Created At</th>
@@ -58,13 +58,28 @@
             <tbody>
             @foreach($paymentGateways as $gateway)
                 <tr>
-                    <td>{{$gateway->id}}</td>
-                    <td>{{$gateway->app_id}}</td>
-                    <td>{{$gateway->app_secret}}</td>
+                    <td>{{$gateway->type->name}}</td>
+
+                    <td>
+                        <div class="key-wrapper">
+                            {{$gateway->app_id}}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="key-wrapper">
+                            {{$gateway->app_secret}}
+                        </div>
+                    </td>
                     <td>{{$gateway->created_at->format('jS F Y g:i A')}}</td>
                     <td>
-                        <a class="btn btn-primary" href="{!! route('payment.stripe.view', $gateway->app_id) !!}">Create Payment</a>
-                        <a class="btn btn-primary">Download Script</a>
+
+                        @php
+                            $paymentUrl = $gateway->type->name === 'Paypal' ? route('payment.paypal.view', $gateway->app_id) : route('payment.stripe.view', $gateway->app_id);
+                        @endphp
+
+                        <a class="btn btn-primary m-1" href="{!! $paymentUrl !!}">Create Payment</a>
+
+                        <a class="btn btn-primary m-1" >Download Script</a>
                     </td>
                 </tr>
             @endforeach
@@ -75,3 +90,12 @@
 </body>
 </html>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<style>
+    .key-wrapper {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        width: 300px;
+    }
+</style>

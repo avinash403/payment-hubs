@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StripePayment;
 use App\Models\PaymentGateway;
-use Illuminate\Http\Request;
 use Stripe;
 
 class StripePaymentController extends Controller
@@ -23,7 +22,6 @@ class StripePaymentController extends Controller
      */
     public function process(StripePayment $request, $appId)
     {
-        // setting up secret key
         $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
 
         Stripe::setApiKey($appSecret);
