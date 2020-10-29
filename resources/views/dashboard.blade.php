@@ -60,11 +60,51 @@
                     </td>
                     <td>
                         <a class="btn btn-primary m-1" href="{!! $gateway->payment_url !!}">Create Payment</a>
-                        <a class="btn btn-primary m-1" >Download Script</a>
+
+                        <button type="button" class="btn btn-primary m-1" data-toggle="modal" data-target="#modal-{!! $gateway->id !!}" onclick="getWidgetCode('{!! $gateway->app_id !!}', '{!! $gateway->id !!}')">Widget Code</button>
+
+                        @component('helpers.modal', ['label'=>'Widget Code', 'id'=> 'modal-'.$gateway->id])
+                            <div class="form-group">
+                                <textarea class="form-control" id="widget-code-{!! $gateway->id !!}" style="height: 300px;"></textarea>
+                            </div>
+
+                            @slot('action')
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                <button onclick="copyToClipboard('{!! $gateway->id !!}')" id="copy-widget-code-{!! $gateway->id !!}" type="button" class="btn btn-primary">Copy To Clipboard</button>
+                            @endslot
+                        @endcomponent
+
                     </td>
                 </tr>
             @endforeach
             </tbody>
         </table>
     </div>
+
+@endsection
+
+@section('footer-script')
+<script>
+    {{-- ajax call to get source code of the widget --}}
+    function getWidgetCode(appId, gatewayId){
+        $.ajax({
+            url: '{!! url('/widget-code') !!}/'+ appId,
+            method: 'GET',
+            success: (res) => {
+                document.getElementById('widget-code-'+gatewayId).innerHTML = res;
+            },
+            error: (err) => {
+                console.debug(err)
+            }
+        })
+    }
+
+    function copyToClipboard(gatewayId) {
+        let copyText = document.getElementById('widget-code-'+gatewayId);
+        copyText.select();
+        document.execCommand("copy");
+        document.getElementById('copy-widget-code-'+gatewayId).innerText = 'Copied To Clipboard';
+    }
+
+</script>
 @endsection

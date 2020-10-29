@@ -21,4 +21,17 @@ class PaymentGatewayController extends Controller
 
         return redirect()->back()->with('success', 'Payment Gateway added successfully');
     }
+
+    /**
+     * Gets widget code in HTML format
+     * @param $appId
+     * @return string
+     */
+    public function getWidgetCode($appId)
+    {
+        if($gateway = PaymentGateway::where('app_id', $appId)->first()){
+            return response($gateway->widget_code);
+        }
+        return response('Not Found', 404);
+    }
 }

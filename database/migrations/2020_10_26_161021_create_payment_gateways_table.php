@@ -17,7 +17,7 @@ class CreatePaymentGatewaysTable extends Migration
             $table->id();
 
             $table->bigInteger('payment_gateway_type_id')->unsigned()->nullable();
-            $table->foreign('payment_gateway_type_id')->references('id')->on('payment_gateways')->onDelete('cascade');
+            $table->foreign('payment_gateway_type_id')->references('id')->on('payment_gateway_types')->onDelete('cascade');
 
             // user who is creating the payment gateway
             $table->bigInteger('user_id')->unsigned()->nullable();

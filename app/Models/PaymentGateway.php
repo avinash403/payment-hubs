@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\PaymentGatewayController;
+use App\Http\Controllers\PaypalPaymentController;
+use App\Http\Controllers\StripePaymentController;
 use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -72,7 +75,28 @@ class PaymentGateway extends Model
                 return route('payment.stripe.view', $this->app_id);
 
             default:
-                throw new Exception(`Payment Gateway {$this->type->name} not support`);
+                throw new Exception("Payment Gateway {$this->type->name} not support");
+        }
+    }
+
+
+    /**
+     * Gives the URL at which payment can be made
+     * @return string
+     * @throws Exception
+     * @internal currently only paypal and stripe is added to the list. In future, can scale it for more
+     */
+    public function getWidgetCodeAttribute()
+    {
+        switch ($this->type->name){
+            case 'Stripe':
+                return htmlentities((new StripePaymentController)->stripe($this->app_id)->render());
+
+            case 'Paypal':
+                return htmlentities((new PaypalPaymentController())->paypal($this->app_id)->render());
+
+            default:
+                throw new Exception("Payment Gateway {$this->type->name} not support");
         }
     }
 }

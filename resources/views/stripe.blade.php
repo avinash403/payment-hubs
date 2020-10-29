@@ -24,13 +24,6 @@
     <script src="https://checkout.stripe.com/checkout.js"></script>
 
     <script type="text/javascript">
-        $(document).ready(function () {
-            $.ajaxSetup({
-                headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                }
-            });
-        });
 
         $('#make-payment').click(function () {
             const amount = $('.amount').val();

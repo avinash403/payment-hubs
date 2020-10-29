@@ -25,6 +25,16 @@
 </body>
 </html>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+    {{-- setup for ajax requests   --}}
+    $(document).ready(function () {
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+    });
+</script>
 <style>
     .key-wrapper {
         overflow: hidden;
@@ -33,3 +43,4 @@
         width: 300px;
     }
 </style>
+@yield('footer-script')
