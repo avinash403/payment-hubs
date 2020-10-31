@@ -101,7 +101,7 @@ class PaypalPaymentController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function getPaymentStatus(Request $request)
+    public function paymentStatus(Request $request)
     {
         $appId = Session::get('paypal_app_id');
 

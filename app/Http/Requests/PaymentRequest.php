@@ -4,8 +4,18 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StripePayment extends FormRequest
+class PaymentRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     *
+     * @return bool
+     */
+    public function authorize()
+    {
+        return false;
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -14,8 +24,8 @@ class StripePayment extends FormRequest
     public function rules()
     {
         return [
-            'tokenId'=>'required|string',
             'amount'=>'required|integer',
+            'currency'=>'string' // todo: allow only valid currencies
         ];
     }
 }

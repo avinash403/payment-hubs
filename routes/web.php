@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PaymentGatewayController;
+use App\Http\Controllers\PaypalPaymentController;
 use App\Http\Controllers\StripePaymentController;
 
 /*
@@ -23,11 +24,10 @@ Route::get('dashboard', [PaymentGatewayController::class, 'index'])->name('dashb
 Route::post('payment-gateway', [PaymentGatewayController::class, 'store'])->name('payment-gateway');
 Route::get('widget-code/{appId}', [PaymentGatewayController::class, 'getWidgetCode'])->name('widget-code');
 
-// passing either mysql Id in the url and based on that querying
 Route::get('stripe/{appId}', [StripePaymentController::class, 'stripe'])->name('payment.stripe.view');
-Route::post('stripe/{appId}/payment-process', [StripePaymentController::class, 'process'])->name('payment.stripe.process');
+Route::post('stripe/{appId}/checkout-session', [StripePaymentController::class, 'createCheckoutSession'])->name('payment.stripe.session');
+Route::get('stripe/{appId}/payment-status', [StripePaymentController::class, 'paymentStatus'])->name('payment.stripe.status');
 
-
-Route::get('paypal/{appId}', [\App\Http\Controllers\PaypalPaymentController::class, 'paypal'])->name('payment.paypal.view');
-Route::post('paypal/{appId}/payment-process', [\App\Http\Controllers\PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
-Route::get('paypal/payment/status', [\App\Http\Controllers\PaypalPaymentController::class, 'getPaymentStatus'])->name('paypal.payment.status');
+Route::get('paypal/{appId}', [PaypalPaymentController::class, 'paypal'])->name('payment.paypal.view');
+Route::post('paypal/{appId}/payment-process', [PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
+Route::get('paypal/payment/status', [PaypalPaymentController::class, 'paymentStatus'])->name('paypal.payment.status');

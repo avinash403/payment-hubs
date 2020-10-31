@@ -13,7 +13,7 @@
             <div class="form-group">
 
                 <label class="label">Enter Amount</label>
-                <input type="text" name="amount" class="form-control amount">
+                <input type="number" name="amount" class="form-control amount">
             </div>
             <button type="submit" class="btn btn-primary btn-block">Pay</button>
             {!! Form::close() !!}

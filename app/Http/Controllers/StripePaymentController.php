@@ -2,50 +2,92 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StripePayment;
 use App\Models\PaymentGateway;
-use Stripe;
+use Illuminate\Http\Request;
+use Stripe\Checkout\Session;
+use Stripe\Exception\ApiErrorException;
+use Stripe\Stripe;
+
 
 class StripePaymentController extends Controller
 {
 
+    /**
+     * Gives view page of stripe
+     * @param $appId
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     */
     public function stripe($appId)
     {
         return view('stripe', compact('appId'));
     }
 
     /**
-     * Sends payment request to stripe server
-     * @param StripePayment $request
+     * Creates a checkout session
      * @param $appId
-     * @return string
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function process(StripePayment $request, $appId)
+    public function createCheckoutSession($appId, Request $request)
     {
-        $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
+        try {
+            $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
 
-        Stripe::setApiKey($appSecret);
+            Stripe::setApiKey($appSecret);
 
-        try{
-            return Stripe::charges()->create([
-                'source' => $request->get('tokenId'),
-                'currency' => 'USD',
-                'amount' => $request->get('amount') * 100,
-                'description'=> 'donation test',
-                'shipping'=> [
-                    "name"=> "Jenny Rosen",
-                    "address"=> [
-                        "line1"=> "510 Townsend St",
-                        "postal_code"=> "98140",
-                        "city"=> "San Francisco",
-                        "state"=> "CA",
-                        "country"=> "US"
-                    ]
-                ]
+            $session = Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => 'Donation',
+                        ],
+                        'unit_amount' => $request->input('amount') * 100,
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
             ]);
 
-        } catch (\Exception $e) {
-            return $e->getMessage();
+        } catch (ApiErrorException $e) {
+            return response()->json(['id'=> $e->getMessage()], 500);
+        }
+        return response()->json(['id'=> $session->id]);
+    }
+
+    /**
+     * Updates the payment status
+     * @param $appId
+     * @param Request $request
+     */
+    public function paymentStatus($appId, Request $request)
+    {
+        try {
+            $appSecret = PaymentGateway::where('app_id', $appId)->value('app_secret');
+
+            Stripe::setApiKey($appSecret);
+
+            $session = Session::retrieve($request->input('session_id'));
+
+            if ($session->payment_status === 'paid') {
+                // update payment detail for success
+                // whenever checkout is clicked, make a payment entry with the details
+                return redirect(route('payment.stripe.view', $appId))->with('success', 'Payment successfully done');
+            } else {
+
+                // update payment status for failure
+                return redirect(route('payment.stripe.view', $appId))->with('error', 'Payment failed');
+            }
+
+//            dd($session, $request->input('session_id'), $session->payment_status); // 'paid'
+
+        } catch (ApiErrorException $e) {
+            return redirect(route('payment.stripe.view', $appId))->with('error', $e->getMessage());
+        } catch (\Exception $e){
+            return redirect(route('payment.stripe.view', $appId))->with('error', 'Some error encountered');
         }
     }
 }
