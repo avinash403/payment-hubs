@@ -33,7 +33,14 @@ class Payment extends Model
     protected $fillable = [
 
         // transaction ID or some kind of identifier to keep the logs
-        'payment_id',
-        'amount'
+        'transaction_id',
+        'amount',
+        'payment_gateway_id',
+        'status',
     ];
+
+    public function gateway()
+    {
+        return $this->belongsTo(PaymentGateway::class, 'payment_gateway_id');
+    }
 }

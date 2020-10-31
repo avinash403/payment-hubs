@@ -7,25 +7,31 @@
 @section('content')
         {{--    Form to create a payment gateway    --}}
         {!! Form::open(['route'=>'payment-gateway', 'method'=>'post', 'class'=>'form-group row']) !!}
-        <div class="col col-md-4">
+        <div class="col col-md-3">
             {!! Form::label('app_id', 'App Id') !!}
             {!! Form::text('app_id', null, ['class'=>'form-control', 'required'=> true]) !!}
         </div>
 
-        <div class="col col-md-4">
+        <div class="col col-md-3">
             {!! Form::label('app_secret', 'App Secret') !!}
             {!! Form::password('app_secret', ['class'=>'form-control', 'required'=> true]) !!}
         </div>
 
-        <div class="col col-md-2">
+        <div class="col col-md-3">
             {!! Form::label('payment_gateway_type_id', 'Type') !!}
             {!! Form::select('payment_gateway_type_id', $paymentGatewayTypes, null, ['class'=>'form-control']) !!}
         </div>
 
-        <div class="col col-md-2">
+        <div class="col col-md-1">
             <br>
             <button class="btn btn-primary mt-2">Submit</button>
         </div>
+
+        <div class="col col-md-2">
+            <br>
+            <a href="{!! route('payments') !!}" class="btn btn-primary mt-2">Payment History</a>
+        </div>
+
         {!! Form::close() !!}
 
     <br><br>

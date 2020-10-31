@@ -28,7 +28,7 @@ class PaypalPaymentController extends Controller
      * @param $appId
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
-    public function paypal($appId)
+    public function create($appId)
     {
         return view('paypal', compact('appId'));
     }
