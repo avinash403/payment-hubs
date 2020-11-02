@@ -11,7 +11,6 @@ use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
 use Stripe\Product;
 use Stripe\Stripe;
-use Stripe\Webhook;
 
 
 class StripePaymentController extends Controller
@@ -27,8 +26,9 @@ class StripePaymentController extends Controller
      */
     public function create($appId)
     {
-        $this->setPaymentGateway($appId);
-        return view('stripe', compact('appId'));
+        $currencies = ['usd'=>'USD', 'gbp'=>'GBP'];
+
+        return view('stripe', compact('appId', 'currencies'));
     }
 
     /**
@@ -43,9 +43,9 @@ class StripePaymentController extends Controller
             $this->setPaymentGateway($appId);
 
             if($request->input('is_recurring')){
-                $session = $this->createMonthlyPayment($appId, $request->input('amount'));
+                $session = $this->createMonthlyPayment($appId, $request->input('amount'), $request->input('currency'));
             } else {
-                $session = $this->createOneTimePayment($appId, $request->input('amount'));
+                $session = $this->createOneTimePayment($appId, $request->input('amount'), $request->input('currency'));
             }
 
             $this->paymentGateway->payments()->create(['amount'=> $request->input('amount'),
@@ -114,79 +114,21 @@ class StripePaymentController extends Controller
         }
     }
 
-
-    /**
-     * Stripe updates recurring payment here in the backgrounf
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse|string
-     */
-    public function webhook(Request $request)
-    {
-        // Parse the message body (and check the signature if possible)
-        $webhookSecret = getenv('STRIPE_WEBHOOK_SECRET');
-
-        if ($webhookSecret) {
-            try {
-                $event = Webhook::constructEvent(
-                    $request->getContent(),
-                    $request->header('stripe-signature'),
-                    $webhookSecret
-                );
-
-            } catch (\Exception $e) {
-                return response()->json($e->getMessage(), 403);
-            }
-        } else {
-            $event = $request->all();
-        }
-        $type = $event['type'];
-        $object = $event['data']['object'];
-
-        // create a new payment with date and source
-        // need appId
-
-        // Handle the event
-        // Review important events for Billing webhooks
-        // https://stripe.com/docs/billing/webhooks
-        // Remove comment to see the various objects sent for this sample
-        switch ($type) {
-            case 'invoice.paid':
-                // The status of the invoice will show up as paid. Store the status in your
-                // database to reference when a user accesses your service to avoid hitting rate
-                // limits.
-                return 'success';
-            case 'invoice.payment_failed':
-                // If the payment fails or the customer does not have a valid payment method,
-                // an invoice.payment_failed event is sent, the subscription becomes past_due.
-                // Use this webhook to notify your user that their payment has
-                // failed and to retrieve new card details.
-                return 'failed';
-            case 'customer.subscription.deleted':
-                // handle subscription cancelled automatically based
-                // upon your subscription settings. Or if the user
-                // cancels it.
-                return 'deleted';
-            default:
-                // Unhandled event type
-        }
-
-        return response()->json('success', 403);
-    }
-
     /**
      * Makes a one time payment
      * @param $appId
      * @param $amount
+     * @param $currency
      * @return Session
      * @throws ApiErrorException
      */
-    private function createOneTimePayment($appId, $amount)
+    private function createOneTimePayment($appId, $amount, $currency)
     {
         return Session::create([
             'payment_method_types' => ['card'],
             'line_items' => [[
                 'price_data' => [
-                    'currency' => 'usd',
+                    'currency' => $currency,
                     'product_data' => [ 'name' => 'Donation'],
                     'unit_amount' => $amount * 100,
                 ],
@@ -202,13 +144,14 @@ class StripePaymentController extends Controller
      * Makes a monthly payment
      * @param $appId
      * @param $amount
+     * @param $currency
      * @return Session
      * @throws ApiErrorException
      */
-    private function createMonthlyPayment($appId, $amount)
+    private function createMonthlyPayment($appId, $amount, $currency)
     {
         // add check if this price exists
-        $price = $this->getPrice($amount, 'USD');
+        $price = $this->getPrice($amount, $currency);
 
         return Session::create([
             'payment_method_types' => ['card'],
@@ -232,19 +175,19 @@ class StripePaymentController extends Controller
      */
     private function getPrice($amount, $currency)
     {
-        $productId = $this->getProduct();
+        $productId = $this->getProduct()->id;
 
         // amount is given in cents or paisa. Has to be converted into dollar or rupees
         $amount = $amount * 100;
         foreach (Price::all() as $price){
             // if price exists with passed product ID, we return the same else create a new price
             if($price->product === $productId && $price->unit_amount === $amount
-                && $price->currency === $currency) {
+                && strtolower($price->currency) === strtolower($currency)) {
                 return $price;
             }
         }
 
-        return Price::create(['currency'=> 'usd', 'product'=>$productId,
+        return Price::create(['currency'=> $currency, 'product'=>$productId,
             'recurring'=>['interval'=>'month', 'interval_count'=> 1], 'unit_amount'=> $amount]);
     }
 
@@ -261,5 +204,10 @@ class StripePaymentController extends Controller
             }
         }
         return Product::create(['name'=> self::PRODUCT_NAME]);
+    }
+
+    private function isValidConfiguration($appId, $appSecret)
+    {
+        Stripe::setApiKey($appSecret);
     }
 }
