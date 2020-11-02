@@ -32,10 +32,36 @@ class Payment extends Model
 {
     protected $fillable = [
 
-        // transaction ID or some kind of identifier to keep the logs
+        /**
+         * session id which is temporarily generated during the payment to identify payment object during the course of
+         * payment in different requests (payment session creation and payment status)
+         */
+        'session_id',
+
+        /**
+         * Identifier with which payment can be referred to in the third party service
+         */
         'transaction_id',
+
+        /**
+         * Amount which needs to be donated
+         */
         'amount',
+
+        /**
+         * reference for payment gateway
+         */
         'payment_gateway_id',
+
+        /**
+         * Email of the customer
+         */
+        'customer_email',
+
+        /**
+         * status of the payment
+         * possible values : 'PENDING', 'SUCCESS', 'FAILED'
+         */
         'status',
     ];
 
