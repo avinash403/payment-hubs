@@ -14,7 +14,7 @@
 
         <div class="col col-md-3">
             {!! Form::label('app_secret', 'App Secret') !!}
-            {!! Form::password('app_secret', ['class'=>'form-control', 'required'=> true]) !!}
+            {!! Form::text('app_secret', null, ['class'=>'form-control', 'required'=> true]) !!}
         </div>
 
         <div class="col col-md-3">

@@ -61,9 +61,22 @@ class PaypalPaymentController extends Controller
             }
         }
 
-
         $currencies = ['usd'=>'USD', 'gbp'=>'GBP'];
         return view('paypal', compact('appId', 'currencies'));
+    }
+
+    /**
+     * Check if credentials provided is correct by requesting an access token
+     * @param $appId
+     * @param $appSecret
+     */
+    public function isValidCredentials($appId, $appSecret)
+    {
+        try{
+            return (bool)$this->getAccessToken($appId, $appSecret);
+        } catch (\Exception $e){
+            return false;
+        }
     }
 
     /**
