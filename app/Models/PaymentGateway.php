@@ -6,6 +6,7 @@ use App\Http\Controllers\PaypalPaymentController;
 use App\Http\Controllers\StripePaymentController;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 
 /**
  * App\Models\PaymentGateway
@@ -96,7 +97,7 @@ class PaymentGateway extends Model
                 return htmlentities((new StripePaymentController)->create($this->app_id)->render());
 
             case 'Paypal':
-                return htmlentities((new PaypalPaymentController)->create($this->app_id)->render());
+                return htmlentities((new PaypalPaymentController)->create($this->app_id, new Request())->render());
 
             default:
                 throw new Exception("Payment Gateway {$this->type->name} not support");

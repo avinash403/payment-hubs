@@ -33,5 +33,5 @@ Route::get('stripe/{appId}/payment-status', [StripePaymentController::class, 'pa
 Route::get('paypal/{appId}', [PaypalPaymentController::class, 'create'])->name('payment.paypal.view');
 Route::post('paypal/{appId}', [PaypalPaymentController::class, 'paymentOptions'])->name('payment.paypal.options');
 
-Route::post('paypal/{appId}/payment-process', [PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
+//Route::post('paypal/{appId}/payment-process', [PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
 Route::get('paypal/payment/status', [PaypalPaymentController::class, 'paymentStatus'])->name('paypal.payment.status');

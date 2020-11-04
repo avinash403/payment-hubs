@@ -10,7 +10,7 @@ class PaymentController extends Controller
 {
     public function index()
     {
-        $payments = Payment::with('gateway','gateway.type:id,name')->get();
+        $payments = Payment::with('gateway','gateway.type:id,name')->orderBy('created_at', 'desc')->get();
 
         return view('payments', compact('payments'));
     }
