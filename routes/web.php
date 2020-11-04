@@ -34,4 +34,4 @@ Route::get('paypal/{appId}', [PaypalPaymentController::class, 'create'])->name('
 Route::post('paypal/{appId}', [PaypalPaymentController::class, 'paymentOptions'])->name('payment.paypal.options');
 
 //Route::post('paypal/{appId}/payment-process', [PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
-Route::get('paypal/payment/status', [PaypalPaymentController::class, 'paymentStatus'])->name('paypal.payment.status');
+//Route::get('paypal/payment/status', [PaypalPaymentController::class, 'paymentStatus'])->name('paypal.payment.status');

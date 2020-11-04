@@ -49,7 +49,7 @@ class StripePaymentController extends Controller
             }
 
             $this->paymentGateway->payments()->create(['amount'=> $request->input('amount'),
-                'status'=> 'PENDING', 'session_id'=> $session->id]);
+                'currency'=> $request->input('currency'), 'status'=> 'PENDING', 'session_id'=> $session->id]);
 
         } catch (ApiErrorException $e) {
             return response()->json($e->getMessage(), 500);

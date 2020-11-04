@@ -8,8 +8,8 @@
 @section('content')
     <div class="row">
         <div class="col-md-4 offset-md-4">
-            <h1>{!! $amount !!} &nbsp; {!! strtoupper($currency) !!}</h1>
-
+            <h1 class="text-center">{!! $amount !!}{!! strtoupper($currency) !!}</h1>
+            <br>
             @if($planId)
                 <script src="https://www.paypal.com/sdk/js?client-id={!! $appId !!}&vault=true"></script>
             @else
@@ -22,7 +22,6 @@
     @if($planId)
     <script>
         paypal.Buttons({
-
             createSubscription: function(data, actions) {
                 return actions.subscription.create({
                     'plan_id': '{!! $planId !!}'
@@ -31,16 +30,16 @@
 
             onApprove: function(data, actions) {
                 console.debug('onApprove',data, actions)
-                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1';
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
             },
 
             onError: function (err) {
                 console.debug('onError',err)
-                alert('Something went wrong');
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
             },
             onCancel: function (data) {
                 console.debug('onCancel',data)
-                alert('Payment could not complete');
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
             }
         }).render('#paypal-button-container');
     </script>
@@ -61,16 +60,16 @@
 
                 onApprove: function(data, actions) {
                     console.debug('onApprove',data, actions)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1';
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
                 },
 
                 onError: function (err) {
                     console.debug('onError',err)
-                    alert('Something went wrong');
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
                 },
                 onCancel: function (data) {
                     console.debug('onCancel',data)
-                    alert('Payment could not complete');
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
                 }
             }).render('#paypal-button-container');
         </script>

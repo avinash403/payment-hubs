@@ -25,7 +25,7 @@
                         {{$payment->gateway->type->name}}
                     </td>
                     <td>
-                        <div class="key-wrapper">{{$payment->amount}}</div>
+                        <div class="key-wrapper">{{$payment->amount}}{{strtoupper($payment->currency)}}</div>
                     </td>
                     <td>
                         {{$payment->created_at->format('jS F Y g:i A')}}

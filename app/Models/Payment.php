@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Crypt;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -49,6 +50,11 @@ class Payment extends Model
         'amount',
 
         /**
+         * currency in which amount is donated
+         */
+        'currency',
+
+        /**
          * reference for payment gateway
          */
         'payment_gateway_id',
@@ -68,5 +74,10 @@ class Payment extends Model
     public function gateway()
     {
         return $this->belongsTo(PaymentGateway::class, 'payment_gateway_id');
+    }
+
+    public function getEncryptedIdAttribute()
+    {
+        return Crypt::encryptString($this->id);
     }
 }

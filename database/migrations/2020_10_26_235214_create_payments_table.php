@@ -21,6 +21,7 @@ class CreatePaymentsTable extends Migration
             $table->string('transaction_id')->nullable();
             $table->string('customer_email')->nullable();
             $table->string('amount');
+            $table->string('currency')->default('usd');
             $table->string('status', 30);
             $table->timestamps();
         });
