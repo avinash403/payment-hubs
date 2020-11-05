@@ -28,6 +28,22 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Payment whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Payment whereUserId($value)
  * @mixin \Eloquent
+ * @property string|null $session_id
+ * @property string|null $transaction_id
+ * @property string|null $customer_email
+ * @property string $currency
+ * @property string $status
+ * @property-read \App\Models\PaymentGateway $gateway
+ * @property-read mixed $encrypted_id
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereCurrency($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereCustomerEmail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereSessionId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereTransactionId($value)
+ * @property string|null $customer_name
+ * @property string|null $frequency
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereCustomerName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Payment whereFrequency($value)
  */
 class Payment extends Model
 {
@@ -45,6 +61,22 @@ class Payment extends Model
         'transaction_id',
 
         /**
+         * Name of the customer
+         */
+        'customer_name',
+
+        /**
+         * Email of the customer
+         */
+        'customer_email',
+
+        /**
+         * frequency of the payment
+         * It will either be MONTHLY or null. Can be scaled to make YEARLY
+         */
+        'frequency',
+
+        /**
          * Amount which needs to be donated
          */
         'amount',
@@ -58,11 +90,6 @@ class Payment extends Model
          * reference for payment gateway
          */
         'payment_gateway_id',
-
-        /**
-         * Email of the customer
-         */
-        'customer_email',
 
         /**
          * status of the payment

@@ -30,16 +30,16 @@
 
             onApprove: function(data, actions) {
                 console.debug('onApprove',data, actions)
-                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
             },
 
             onError: function (err) {
                 console.debug('onError',err)
-                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
             },
             onCancel: function (data) {
                 console.debug('onCancel',data)
-                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
             }
         }).render('#paypal-button-container');
     </script>
@@ -60,16 +60,16 @@
 
                 onApprove: function(data, actions) {
                     console.debug('onApprove',data, actions)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?success=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
                 },
 
                 onError: function (err) {
                     console.debug('onError',err)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
                 },
                 onCancel: function (data) {
                     console.debug('onCancel',data)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderId;
+                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}'+ '?error=1&payment_id={!! $paymentId !!}&transaction_id='+data.orderID;
                 }
             }).render('#paypal-button-container');
         </script>

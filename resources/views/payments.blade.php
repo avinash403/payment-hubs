@@ -12,6 +12,9 @@
             <thead>
             <tr>
                 <th scope="col">Type</th>
+                <th scope="col">Customer Name</th>
+                <th scope="col">Customer Email</th>
+                <th scope="col">Frequency</th>
                 <th scope="col">Amount</th>
                 <th scope="col">Initiated At</th>
                 <th scope="col">Status</th>
@@ -23,6 +26,15 @@
                 <tr>
                     <td>
                         {{$payment->gateway->type->name}}
+                    </td>
+                    <td>
+                        {{$payment->customer_name}}
+                    </td>
+                    <td>
+                        {{$payment->customer_email}}
+                    </td>
+                    <td>
+                        {{$payment->frequency ?? 'one-time'}}
                     </td>
                     <td>
                         <div class="key-wrapper">{{$payment->amount}}{{strtoupper($payment->currency)}}</div>

@@ -48,8 +48,10 @@ class StripePaymentController extends Controller
                 $session = $this->createOneTimePayment($appId, $request->input('amount'), $request->input('currency'));
             }
 
+            $frequency = $request->input('is_recurring') ? 'monthly': null;
+
             $this->paymentGateway->payments()->create(['amount'=> $request->input('amount'),
-                'currency'=> $request->input('currency'), 'status'=> 'PENDING', 'session_id'=> $session->id]);
+                'currency'=> $request->input('currency'), 'status'=> 'PENDING', 'session_id'=> $session->id, 'frequency'=> $frequency]);
 
         } catch (ApiErrorException $e) {
             return response()->json($e->getMessage(), 500);
@@ -78,13 +80,13 @@ class StripePaymentController extends Controller
                 // whenever checkout is clicked, make a payment entry with the details
                 $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
                     ->update(['status'=> 'SUCCESS', 'transaction_id'=> $session->payment_intent,
-                        'customer_email'=> $customer->email]);
+                        'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.stripe.view', $appId))->with('success', 'Thank you for your valuable contribution!');
             } else {
                 $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
                     ->update(['status'=> 'FAILED', 'transaction_id'=> $session->payment_intent,
-                        'customer_email'=> $customer->email]);
+                        'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.stripe.view', $appId))->with('error', 'Payment failed');
             }

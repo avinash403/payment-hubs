@@ -33,6 +33,9 @@ use Illuminate\Http\Request;
  * @property-read string $payment_url
  * @property-read \App\Models\PaymentGatewayType|null $type
  * @method static \Illuminate\Database\Eloquent\Builder|PaymentGateway whereAppId($value)
+ * @property-read string $widget_code
+ * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Payment[] $payments
+ * @property-read int|null $payments_count
  */
 class PaymentGateway extends Model
 {

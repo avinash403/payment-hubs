@@ -48,17 +48,19 @@ class PaypalPaymentController extends Controller
      */
     public function create($appId, Request $request)
     {
+
         if ($request->input('payment_id')) {
             $paymentId = Crypt::decryptString($request->input('payment_id'));
+            $this->updatePayment($appId, $request->input('transaction_id'), $paymentId);
             $payment = Payment::find($paymentId);
 
             if ($request->input('success')) {
-                $payment->update(['status' => 'SUCCESS']);
+                $payment->update(['status' => 'SUCCESS', 'transaction_id' => $request->input('transaction_id')]);
                 return redirect(route('payment.paypal.view', $appId))->with('success', 'Thank you for your valuable contribution!');
             }
 
             if ($request->input('error')) {
-                $payment->update(['status' => 'FAILED']);
+                $payment->update(['status' => 'FAILED', 'transaction_id' => $request->input('transaction_id')]);
                 return redirect(route('payment.paypal.view', $appId))->with('error', 'Payment failed!');
             }
         }
@@ -121,8 +123,10 @@ class PaypalPaymentController extends Controller
         $planId = $request->input('is_recurring') ? $this->getPlanIdByAmount($appId, $amount, $currency) : null;
         $this->setPaymentGateway($appId);
 
+        $frequency = $request->input('is_recurring') ? 'monthly': null;
+
         $paymentId = $this->paymentGateway->payments()->create(['amount' => $request->input('amount'),
-            'currency' => $request->input('currency'), 'status' => 'PENDING'])->encrypted_id;
+            'currency' => $request->input('currency'), 'status' => 'PENDING', 'frequency'=> $frequency])->encrypted_id;
 
         return view('paypal-payment-option', compact('amount', 'currency', 'planId', 'appId', 'paymentId'));
     }
@@ -211,6 +215,47 @@ class PaypalPaymentController extends Controller
         ]);
 
         return json_decode($response->getBody()->getContents());
+    }
+
+    /**
+     * Gets product with default name. If doesn't exist, it creates one
+     * @param string $appId
+     * @param string $transactionId
+     * @param integer $paymemtId
+     * @return mixed
+     * @throws GuzzleException
+     */
+    private function updatePayment($appId, $transactionId, $paymemtId)
+    {
+        $this->setPaymentGateway($appId);
+
+        $accessToken = $this->getAccessToken($appId, $this->paymentGateway->app_secret);
+
+        $response = $this->client->get($this->baseUrl . '/v2/checkout/orders/'.'7RS701339W098503H', [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken
+            ]
+        ]);
+
+        $response = json_decode($response->getBody()->getContents());
+
+        $payment = Payment::find($paymemtId);
+
+        $payment->customer_name = $response->payer->name->given_name. ' '.$response->payer->name->surname;
+        $payment->customer_email = $response->payer->email_address;
+        $payment->transaction_id = $transactionId;
+
+            // updating with the latest details to avoid client side manipulations
+        // at server side while plan creation
+        $payment->status = $response->status;
+
+        // in case of direct payments, amount confirmation is needed. In case of subscriptions, it is already validated
+        if (isset($response->purchase_units[0])){
+            $payment->amount = (int)$response->purchase_units[0]->amount->value;
+            $payment->currency = strtolower($response->purchase_units[0]->amount->currency_code);
+        }
+        $payment->save();
     }
 
     /**
