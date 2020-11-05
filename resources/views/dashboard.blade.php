@@ -5,6 +5,16 @@
 @endsection
 
 @section('content')
+        <style>
+            .key-wrapper {
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                width: 300px;
+            }
+        </style>
+
+
         {{--    Form to create a payment gateway    --}}
         {!! Form::open(['route'=>'payment-gateway', 'method'=>'post', 'class'=>'form-group row']) !!}
         <div class="col col-md-3">

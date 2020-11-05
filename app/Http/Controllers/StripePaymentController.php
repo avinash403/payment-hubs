@@ -19,6 +19,10 @@ class StripePaymentController extends Controller
 
     const PRODUCT_NAME = 'Hiba-box';
 
+    const CURRENCY = 'gbp';
+
+    const CURRENCY_SYMBOL = '£';
+
     /**
      * Gives view page of stripe
      * @param $appId
@@ -26,9 +30,9 @@ class StripePaymentController extends Controller
      */
     public function create($appId)
     {
-        $currencies = ['usd'=>'USD', 'gbp'=>'GBP'];
-
-        return view('stripe', compact('appId', 'currencies'));
+        $currency = self::CURRENCY;
+        $currencySymbol = self::CURRENCY_SYMBOL;
+        return view('stripe', compact('appId', 'currency', 'currencySymbol'));
     }
 
     /**

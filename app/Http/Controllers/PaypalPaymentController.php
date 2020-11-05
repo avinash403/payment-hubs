@@ -12,16 +12,17 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use PayPal\Rest\ApiContext;
 
 class PaypalPaymentController extends Controller
 {
-    const PRODUCT_NAME = 'Hiba-box';
-    /**
-     * @var ApiContext
-     */
-    private $paypal;
     private $paymentGateway;
+
+    const PRODUCT_NAME = 'Hiba-box';
+
+    const CURRENCY = 'gbp';
+
+    const CURRENCY_SYMBOL = '£';
+
     /**
      * Base url to paypal server
      * @internal will be different in sandbox environment and live environment
@@ -65,8 +66,11 @@ class PaypalPaymentController extends Controller
             }
         }
 
-        $currencies = ['usd' => 'USD', 'gbp' => 'GBP'];
-        return view('paypal', compact('appId', 'currencies'));
+        $currency = self::CURRENCY;
+
+        $currencySymbol = self::CURRENCY_SYMBOL;
+
+        return view('paypal', compact('appId', 'currency', 'currencySymbol'));
     }
 
     /**
@@ -128,7 +132,11 @@ class PaypalPaymentController extends Controller
         $paymentId = $this->paymentGateway->payments()->create(['amount' => $request->input('amount'),
             'currency' => $request->input('currency'), 'status' => 'PENDING', 'frequency'=> $frequency])->encrypted_id;
 
-        return view('paypal-payment-option', compact('amount', 'currency', 'planId', 'appId', 'paymentId'));
+        $currency = self::CURRENCY;
+
+        $currencySymbol = self::CURRENCY_SYMBOL;
+
+        return view('paypal-payment-option', compact('amount', 'currency', 'currencySymbol', 'planId', 'appId', 'paymentId'));
     }
 
     /**
@@ -231,7 +239,7 @@ class PaypalPaymentController extends Controller
 
         $accessToken = $this->getAccessToken($appId, $this->paymentGateway->app_secret);
 
-        $response = $this->client->get($this->baseUrl . '/v2/checkout/orders/'.'7RS701339W098503H', [
+        $response = $this->client->get($this->baseUrl . '/v2/checkout/orders/'.$transactionId, [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $accessToken
