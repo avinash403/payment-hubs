@@ -17,7 +17,10 @@
         <label class="label">&nbsp; Make this a monthly donation</label>
     </div>
 
-    <button id="checkout-button" class="btn btn-success btn-block">Continue to donation checkout</button>
+    <button id="checkout-button" onclick="showLoader()" type="submit" class="btn btn-success btn-block">
+        Continue to donation checkout
+        <span id="spinner" style="display: none" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    </button>
 
     <script src="https://js.stripe.com/v3/"></script>
     <script type="text/javascript">

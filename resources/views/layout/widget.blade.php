@@ -49,7 +49,21 @@
 @yield('footer-script')
 
 <script>
+
+    /**
+     * Populates amount in input box
+     * @param amount
+     */
     function onDonationWidgetClick(amount) {
         document.getElementById('amount').value = amount;
+    }
+
+    /**
+     * Changes the visibility of spinner
+     */
+    function showLoader() {
+        if(document.getElementById('amount').value){
+            document.getElementById('spinner').style.display = 'inline-block';
+        }
     }
 </script>
