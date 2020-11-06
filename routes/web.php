@@ -29,6 +29,7 @@ Route::get('payments', [PaymentController::class, 'index'])->name('payments');
 Route::get('stripe/{appId}', [StripePaymentController::class, 'create'])->name('payment.stripe.view');
 Route::post('stripe/{appId}/checkout-session', [StripePaymentController::class, 'createCheckoutSession'])->name('payment.stripe.session');
 Route::get('stripe/{appId}/payment-status', [StripePaymentController::class, 'paymentStatus'])->name('payment.stripe.status');
+Route::post('stripe/{appId}/webhook', [StripePaymentController::class, 'webhookListener'])->name('payment.stripe.webhook-listener');
 
 Route::get('paypal/{appId}', [PaypalPaymentController::class, 'create'])->name('payment.paypal.view');
 Route::post('paypal/{appId}', [PaypalPaymentController::class, 'paymentOptions'])->name('payment.paypal.options');

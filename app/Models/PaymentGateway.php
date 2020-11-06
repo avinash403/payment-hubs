@@ -36,12 +36,15 @@ use Illuminate\Http\Request;
  * @property-read string $widget_code
  * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Payment[] $payments
  * @property-read int|null $payments_count
+ * @property string|null $webhook_secret
+ * @method static \Illuminate\Database\Eloquent\Builder|PaymentGateway whereWebhookSecret($value)
  */
 class PaymentGateway extends Model
 {
     protected $fillable = [
         'app_id',
         'app_secret',
+        'webhook_secret',
         'payment_gateway_type_id',
     ];
 
@@ -51,7 +54,7 @@ class PaymentGateway extends Model
      * @var string[]
      */
     public static $rules = [
-        'app_id'=>'required|unique:payment_gateways,app_id',
+//        'app_id'=>'required|unique:payment_gateways,app_id',
         'app_secret'=>'required',
         'payment_gateway_type_id'=>'required|exists:payment_gateway_types,id',
     ];

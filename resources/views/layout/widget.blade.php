@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
         .btn-custom {
-            padding: 0.5rem .86rem;
+            padding: 0.5rem .83rem;
         }
     </style>
 </head>

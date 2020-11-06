@@ -7,14 +7,21 @@ use App\Models\PaymentGateway;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
 use Stripe\Customer;
+use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
+use Stripe\Exception\SignatureVerificationException;
 use Stripe\Price;
 use Stripe\Product;
 use Stripe\Stripe;
+use Stripe\Webhook;
+use Stripe\WebhookEndpoint;
 
 
 class StripePaymentController extends Controller
 {
+    /**
+     * @var PaymentGateway
+     */
     private $paymentGateway;
 
     const PRODUCT_NAME = 'Hiba-box';
@@ -30,6 +37,8 @@ class StripePaymentController extends Controller
      */
     public function create($appId)
     {
+        $this->setPaymentGateway($appId);
+
         $currency = self::CURRENCY;
         $currencySymbol = self::CURRENCY_SYMBOL;
         return view('stripe', compact('appId', 'currency', 'currencySymbol'));
@@ -212,8 +221,105 @@ class StripePaymentController extends Controller
         return Product::create(['name'=> self::PRODUCT_NAME]);
     }
 
-    private function isValidConfiguration($appId, $appSecret)
+    /**
+     * @param $appId
+     * @param $appSecret
+     */
+    public function isValidCredentials($appId, $appSecret)
+    {
+        try {
+            $webhook = $this->createWebhook($appId, $appSecret);
+            return ['webhook_secret' => $webhook->secret];
+        } catch (\Exception $e){
+            return false;
+        }
+    }
+
+    /**
+     * Creates webhook
+     * @param $appId
+     * @param $appSecret
+     * @throws ApiErrorException
+     */
+    private function createWebhook($appId, $appSecret)
     {
         Stripe::setApiKey($appSecret);
+
+        return WebhookEndpoint::create([
+            'url'=> route('payment.stripe.webhook-listener', $appId),
+            'enabled_events'=> ['invoice.payment_succeeded', 'invoice.payment_failed']
+        ]);
+    }
+
+    /**
+     * Listens for webhook calls and update payments accordingly
+     * @param $appId
+     * @param Request $request
+     */
+    public function webhookListener($appId, Request $request)
+    {
+        try {
+            \Log::info('webhook received');
+
+            $this->setPaymentGateway($appId);
+
+            // stripe only worked with raw payload
+            $payload = @file_get_contents('php://input');
+
+            \Log::info('before event retrieval');
+            \Log::info($request->header('Stripe-Signature'));
+            \Log::info($_SERVER['HTTP_STRIPE_SIGNATURE']);
+            \Log::info($payload);
+
+
+            // test
+            $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), 'whsec_2kbnrTkjr5zMLKmYg4FZ3if632SjNoCg');
+
+            // live
+//            $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), $this->paymentGateway->webhook_secret);
+
+            \Log::info('webhook verification passed');
+            \Log::info(json_encode($request->all()));
+
+            if(in_array($event->type, ['invoice.payment_succeeded', 'invoice.payment_failed'])){
+
+                $data = $event->data;
+
+                $customerId = $data['object']['customer'];
+
+                $paymentIntentId = $data['object']['payment_intent'];
+
+                $amount = $data['object']['amount_paid'];
+
+                $currency = $data['object']['currency'];
+
+                \Log::info('customerId : '.$customerId);
+                $customer = Customer::retrieve($customerId);
+
+                $paymentStatus = $event->type === "invoice.payment_succeeded" ? 'SUCCESS' : 'FAILED';
+
+                $this->paymentGateway->payments()->create(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId,
+                    'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+                    'amount'=>$amount, 'currency'=>$currency]);
+
+                \Log::info('payment updated successfully');
+
+                return response()->json('payment recorded successfully');
+            }
+
+            return response()->json('event ignored');
+
+        } catch (SignatureVerificationException $e){
+            \Log::error('signaure failed');
+            \Log::error($e->getMessage());
+            return response()->json('signature verification failed', 400);
+        } catch (\Exception $e){
+            \Log::error('error encountered');
+            \Log::error($e->getMessage());
+            \Log::error($e->getLine());
+            \Log::error($e->getFile());
+            \Log::error($e->getTraceAsString());
+            return response()->json('event ignored');
+        }
     }
 }
