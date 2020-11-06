@@ -54,7 +54,7 @@ class PaymentGateway extends Model
      * @var string[]
      */
     public static $rules = [
-//        'app_id'=>'required|unique:payment_gateways,app_id',
+        'app_id'=>'required|unique:payment_gateways,app_id',
         'app_secret'=>'required',
         'payment_gateway_type_id'=>'required|exists:payment_gateway_types,id',
     ];
@@ -100,10 +100,10 @@ class PaymentGateway extends Model
     {
         switch ($this->type->name){
             case 'Stripe':
-                return htmlentities((new StripePaymentController)->create($this->app_id)->render());
+                return htmlentities(view('injectable-code', ['url'=> route('payment.stripe.view', $this->app_id)])->render());
 
             case 'Paypal':
-                return htmlentities((new PaypalPaymentController)->create($this->app_id, new Request())->render());
+                return htmlentities(view('injectable-code', ['url'=> route('payment.paypal.view', $this->app_id)])->render());
 
             default:
                 throw new Exception("Payment Gateway {$this->type->name} not support");

@@ -33,6 +33,7 @@ Route::post('stripe/{appId}/webhook', [StripePaymentController::class, 'webhookL
 
 Route::get('paypal/{appId}', [PaypalPaymentController::class, 'create'])->name('payment.paypal.view');
 Route::post('paypal/{appId}', [PaypalPaymentController::class, 'paymentOptions'])->name('payment.paypal.options');
+Route::post('paypal/{appId}/webhook', [PaypalPaymentController::class, 'webhookListener'])->name('payment.paypal.webhook-listener');
 
-//Route::post('paypal/{appId}/payment-process', [PaypalPaymentController::class, 'payWithPaypal'])->name('payment.paypal.process');
-//Route::get('paypal/payment/status', [PaypalPaymentController::class, 'paymentStatus'])->name('paypal.payment.status');
+Route::get('payment/success', [PaymentController::class, 'success'])->name('payment.success');
+Route::get('payment/failed', [PaymentController::class, 'failed'])->name('payment.failed');

@@ -49,7 +49,6 @@ class PaypalPaymentController extends Controller
      */
     public function create($appId, Request $request)
     {
-
         if ($request->input('payment_id')) {
             $paymentId = Crypt::decryptString($request->input('payment_id'));
             $this->updatePayment($appId, $request->input('transaction_id'), $paymentId);
@@ -57,12 +56,12 @@ class PaypalPaymentController extends Controller
 
             if ($request->input('success')) {
                 $payment->update(['status' => 'SUCCESS', 'transaction_id' => $request->input('transaction_id')]);
-                return redirect(route('payment.paypal.view', $appId))->with('success', 'Thank you for your valuable contribution!');
+                return redirect(route('payment.success'));
             }
 
             if ($request->input('error')) {
                 $payment->update(['status' => 'FAILED', 'transaction_id' => $request->input('transaction_id')]);
-                return redirect(route('payment.paypal.view', $appId))->with('error', 'Payment failed!');
+                return redirect(route('payment.failed'));
             }
         }
 
@@ -81,8 +80,12 @@ class PaypalPaymentController extends Controller
     public function isValidCredentials($appId, $appSecret)
     {
         try {
-            return (bool)$this->getAccessToken($appId, $appSecret);
+            $webhook = $this->createWebhook($appId, $appSecret);
+
+            // NOTE: paypal doesn't need any secret directly from the API but just the id of the webhook
+            return ['webhook_secret'=> $webhook->id];
         } catch (Exception $e) {
+            dd($e);
             return false;
         }
     }
@@ -250,8 +253,11 @@ class PaypalPaymentController extends Controller
 
         $payment = Payment::find($paymemtId);
 
-        $payment->customer_name = $response->payer->name->given_name. ' '.$response->payer->name->surname;
-        $payment->customer_email = $response->payer->email_address;
+        if(isset($response->payer)){
+            $payment->customer_name = $response->payer->name->given_name. ' '.$response->payer->name->surname;
+            $payment->customer_email = $response->payer->email_address;
+        }
+
         $payment->transaction_id = $transactionId;
 
             // updating with the latest details to avoid client side manipulations
@@ -385,5 +391,86 @@ class PaypalPaymentController extends Controller
     private function getPlanName($amount, $currency)
     {
         return "$amount $currency per month";
+    }
+
+    /**
+     * Creates a webhook
+     * @param $appId
+     * @param $appSecret
+     * @throws GuzzleException
+     */
+    private function createWebhook($appId, $appSecret)
+    {
+        $accessToken = $this->getAccessToken($appId,$appSecret);
+
+        $webhookUrl = route('payment.paypal.webhook-listener', $appId);
+
+        if(!($webhook = $this->getWebHook($webhookUrl, $accessToken))){
+            $response = $this->client->post($this->baseUrl . '/v1/notifications/webhooks', [
+                    'headers' => [
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . $accessToken,
+                    ],
+                    'json' => [
+                        'url'=> route('payment.paypal.webhook-listener', $appId),
+                        'event_types'=> [
+                            ['name'=> 'PAYMENT.SALE.COMPLETED'],
+                            ['name'=> 'PAYMENT.SALE.DENIED']
+                        ]
+                    ]
+                ]
+            );
+            $webhook = json_decode($response->getBody()->getContents());
+        }
+
+        return $webhook;
+    }
+
+    /**
+     * Gets webhook object if given url is already created as a webhook
+     * @param $webhookUrl
+     * @param $accessToken
+     * @return mixed
+     * @throws GuzzleException
+     */
+    private function getWebHook($webhookUrl, $accessToken)
+    {
+        $response = $this->client->get($this->baseUrl . '/v1/notifications/webhooks', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ]
+            ]
+        );
+
+        $webhooks = json_decode($response->getBody()->getContents())->webhooks;
+
+        foreach ($webhooks as $webhook){
+            if($webhook->url === $webhookUrl){
+                return $webhook;
+            }
+        }
+    }
+
+    public function webhookListener($appId, Request $request)
+    {
+        $this->setPaymentGateway($appId);
+
+        // signature verification
+        if (in_array($request->event_type, ['PAYMENT.SALE.COMPLETED', 'PAYMENT.SALE.DENIED'])){
+            try {
+
+//                $this->paymentGateway->create();
+
+
+
+//                $this->paymentGateway->payments()->create(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId,
+//                    'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+//                    'amount'=>$amount, 'currency'=>$currency]);
+
+            }catch (Exception $e){
+
+            }
+        }
     }
 }

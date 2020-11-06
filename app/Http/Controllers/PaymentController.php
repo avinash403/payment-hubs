@@ -14,4 +14,18 @@ class PaymentController extends Controller
 
         return view('payments', compact('payments'));
     }
+
+    public function success()
+    {
+        $message = 'Thank you for your valuable contribution!';
+        $status = "success";
+        return view('status', compact('message', 'status'));
+    }
+
+    public function failed()
+    {
+        $message = 'Sorry, we could not process your payment. Please try again!';
+        $status = "failed";
+        return view('status', compact('message', 'status'));
+    }
 }

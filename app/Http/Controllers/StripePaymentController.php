@@ -7,7 +7,6 @@ use App\Models\PaymentGateway;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
 use Stripe\Customer;
-use Stripe\Event;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Price;
@@ -95,13 +94,15 @@ class StripePaymentController extends Controller
                     ->update(['status'=> 'SUCCESS', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
-                return redirect(route('payment.stripe.view', $appId))->with('success', 'Thank you for your valuable contribution!');
+                return redirect(route('payment.success'));
+//                return redirect(route('payment.stripe.view', $appId))->with('success', 'Thank you for your valuable contribution!');
             } else {
                 $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
                     ->update(['status'=> 'FAILED', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
-                return redirect(route('payment.stripe.view', $appId))->with('error', 'Payment failed');
+                return redirect(route('payment.failed'));
+//                return redirect(route('payment.stripe.view', $appId))->with('error', 'Payment failed');
             }
 
         } catch (ApiErrorException $e) {

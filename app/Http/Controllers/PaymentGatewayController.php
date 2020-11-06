@@ -18,9 +18,10 @@ class PaymentGatewayController extends Controller
     public function store(CreatePaymentGateway $request)
     {
         $paymentGatewayName = PaymentGatewayType::whereId($request->payment_gateway_type_id)->value('name');
+
         $metaDataIfValidCredentials = [];
 
-        if($paymentGatewayName === 'Paypal' && !(new PaypalPaymentController())->isValidCredentials($request->app_id, $request->app_secret)){
+        if($paymentGatewayName === 'Paypal' && !($metaDataIfValidCredentials = (new PaypalPaymentController())->isValidCredentials($request->app_id, $request->app_secret))){
             return redirect()->back()->with('error', 'Invalid Credentials');
         }
 
