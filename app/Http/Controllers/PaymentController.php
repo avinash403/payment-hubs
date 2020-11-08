@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 
 use App\Models\Payment;
+use Exception;
 
 class PaymentController extends Controller
 {
@@ -27,5 +28,32 @@ class PaymentController extends Controller
         $message = 'Sorry, we could not process your payment. Please try again!';
         $status = "failed";
         return view('status', compact('message', 'status'));
+    }
+
+
+    public function refund($paymentId)
+    {
+        try {
+            if(!($payment = Payment::find($paymentId))){
+                throw new Exception('Payment Id not found');
+            }
+
+            if($payment->status !== 'SUCCESS'){
+                throw new Exception('Only successful payments can be refunded');
+            }
+
+            if($payment->gateway->type->name === 'Stripe'){
+                (new StripePaymentController())->refund($payment);
+            }
+
+            if($payment->gateway->type->name === 'Paypal'){
+                // paypal refund
+            }
+
+            return redirect()->back()->with('success', 'Refund initiated successfully');
+
+        } catch (Exception $e){
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 }

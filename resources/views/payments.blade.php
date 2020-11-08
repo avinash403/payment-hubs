@@ -18,6 +18,7 @@
                 <th scope="col">Amount</th>
                 <th scope="col">Initiated At</th>
                 <th scope="col">Status</th>
+                <th scope="col">Action</th>
             </tr>
             </thead>
 
@@ -42,8 +43,17 @@
                     <td>
                         {{$payment->created_at->format('jS F Y g:i A')}}
                     </td>
+
                     <td>
-                        <div class="key-wrapper">{{$payment->status}}</div>
+                        {{$payment->status}}
+                    </td>
+
+                    <td>
+                        @if($payment->status === 'SUCCESS')
+                            {!! Form::open(['route'=>['payment.refund', $payment->id], 'method'=>'post']) !!}
+                                <button type="submit" class="btn btn-primary">Refund</button>
+                            {!! Form::close() !!}
+                        @endif
                     </td>
                 </tr>
             @endforeach

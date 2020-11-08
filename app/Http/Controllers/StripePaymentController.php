@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PaymentRequest;
+use App\Models\Payment;
 use App\Models\PaymentGateway;
+use Dotenv\Util\Str;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
 use Stripe\Customer;
@@ -11,7 +13,9 @@ use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Price;
 use Stripe\Product;
+use Stripe\Refund;
 use Stripe\Stripe;
+use Stripe\Subscription;
 use Stripe\Webhook;
 use Stripe\WebhookEndpoint;
 
@@ -45,6 +49,12 @@ class StripePaymentController extends Controller
 
     /**
      * Creates a checkout session
+     * @internal The way it works in by creating a payment entry in the database with status as `pending`. It creates a session on stripe for following 2 scenarios
+     *  one-time : in this case a straight-forward, redirect happens with a success or a failure. And based on sessionId, we can verify the payment's
+     *            transaction_id (payment_intent in stripe's context)
+     *  monthly : in this case id of the payment instance is sent as meta_data to stripe's subscription instance while creating a session. When webhook
+     *             receives an event for success/failure, it retrieves the payment id and update the transaction_id (payment_intent in stripe's context)
+     *
      * @param $appId
      * @param PaymentRequest $request
      * @return \Illuminate\Http\JsonResponse
@@ -54,16 +64,20 @@ class StripePaymentController extends Controller
         try {
             $this->setPaymentGateway($appId);
 
-            if($request->input('is_recurring')){
-                $session = $this->createMonthlyPayment($appId, $request->input('amount'), $request->input('currency'));
-            } else {
-                $session = $this->createOneTimePayment($appId, $request->input('amount'), $request->input('currency'));
-            }
-
             $frequency = $request->input('is_recurring') ? 'monthly': null;
 
-            $this->paymentGateway->payments()->create(['amount'=> $request->input('amount'),
-                'currency'=> $request->input('currency'), 'status'=> 'PENDING', 'session_id'=> $session->id, 'frequency'=> $frequency]);
+            $payment = $this->paymentGateway->payments()->create(['amount'=> $request->input('amount'),
+                'currency'=> $request->input('currency'), 'status'=> 'PENDING', 'frequency'=> $frequency]);
+
+            if($request->input('is_recurring')){
+                $session = $this->createMonthlyPayment($appId, $request->input('amount'), $request->input('currency'), $payment->id);
+            } else {
+                $session = $this->createOneTimePayment($appId, $request->input('amount'), $request->input('currency'), $payment->id);
+            }
+
+            $payment->session_id = $session->id;
+
+            $payment->save();
 
         } catch (ApiErrorException $e) {
             return response()->json($e->getMessage(), 500);
@@ -87,22 +101,22 @@ class StripePaymentController extends Controller
 
             $customer = Customer::retrieve($session->customer);
 
+            /**
+             * In case of payment with subscription, instead of a payment, invoice is generated and payment happens asynchronously.
+             * In that case, we do not have a confirmation on if payment is a success or a failure, so we leave that updation on webhook to handle
+             */
             if ($session->payment_status === 'paid') {
-                // update payment detail for success
-                // whenever checkout is clicked, make a payment entry with the details
-                $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
+                $session->payment_intent && $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
                     ->update(['status'=> 'SUCCESS', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.success'));
-//                return redirect(route('payment.stripe.view', $appId))->with('success', 'Thank you for your valuable contribution!');
             } else {
-                $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
+                $session->payment_intent && $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
                     ->update(['status'=> 'FAILED', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.failed'));
-//                return redirect(route('payment.stripe.view', $appId))->with('error', 'Payment failed');
             }
 
         } catch (ApiErrorException $e) {
@@ -138,7 +152,7 @@ class StripePaymentController extends Controller
      * @return Session
      * @throws ApiErrorException
      */
-    private function createOneTimePayment($appId, $amount, $currency)
+    private function createOneTimePayment($appId, $amount, $currency, $paymentId)
     {
         return Session::create([
             'payment_method_types' => ['card'],
@@ -153,6 +167,11 @@ class StripePaymentController extends Controller
             'mode' => 'payment',
             'success_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
+            'payment_intent_data'=> [
+                'metadata'=> [
+                    'payment_id'=> $paymentId,
+                ]
+            ]
         ]);
     }
 
@@ -164,7 +183,7 @@ class StripePaymentController extends Controller
      * @return Session
      * @throws ApiErrorException
      */
-    private function createMonthlyPayment($appId, $amount, $currency)
+    private function createMonthlyPayment($appId, $amount, $currency, $paymentId)
     {
         // add check if this price exists
         $price = $this->getPrice($amount, $currency);
@@ -178,6 +197,11 @@ class StripePaymentController extends Controller
             'mode' => 'subscription',
             'success_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => route('payment.stripe.status', $appId).'?session_id={CHECKOUT_SESSION_ID}',
+            'subscription_data'=> [
+                'metadata'=> [
+                    'payment_id'=> $paymentId,
+                ]
+            ]
         ]);
     }
 
@@ -253,6 +277,25 @@ class StripePaymentController extends Controller
     }
 
     /**
+     * Initiates a refund
+     * @param Payment $payment
+     * @throws ApiErrorException
+     * @throws \Exception
+     */
+    public function refund(Payment $payment)
+    {
+        $appId = $payment->gateway->app_id;
+
+        $this->setPaymentGateway($appId);
+
+        Refund::create(['payment_intent'=> $payment->transaction_id]);
+
+        $payment->status = 'REFUNDED';
+
+        $payment->save();
+    }
+
+    /**
      * Listens for webhook calls and update payments accordingly
      * @param $appId
      * @param Request $request
@@ -267,12 +310,6 @@ class StripePaymentController extends Controller
             // stripe only worked with raw payload
             $payload = @file_get_contents('php://input');
 
-            \Log::info('before event retrieval');
-            \Log::info($request->header('Stripe-Signature'));
-            \Log::info($_SERVER['HTTP_STRIPE_SIGNATURE']);
-            \Log::info($payload);
-
-
             // test
             $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), 'whsec_2kbnrTkjr5zMLKmYg4FZ3if632SjNoCg');
 
@@ -280,6 +317,7 @@ class StripePaymentController extends Controller
 //            $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), $this->paymentGateway->webhook_secret);
 
             \Log::info('webhook verification passed');
+
             \Log::info(json_encode($request->all()));
 
             if(in_array($event->type, ['invoice.payment_succeeded', 'invoice.payment_failed'])){
@@ -290,18 +328,43 @@ class StripePaymentController extends Controller
 
                 $paymentIntentId = $data['object']['payment_intent'];
 
-                $amount = $data['object']['amount_paid'];
+                $amount = $data['object']['amount_paid']/100;
 
                 $currency = $data['object']['currency'];
 
-                \Log::info('customerId : '.$customerId);
+                $subscriptionId = $data['object']['subscription'];
+
                 $customer = Customer::retrieve($customerId);
+
+                $subscription = Subscription::retrieve($subscriptionId);
+
+                $paymentId = isset($subscription->metadata['payment_id']) ? $subscription->metadata['payment_id'] : null;
+
+                $payment = Payment::find($paymentId);
 
                 $paymentStatus = $event->type === "invoice.payment_succeeded" ? 'SUCCESS' : 'FAILED';
 
-                $this->paymentGateway->payments()->create(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId,
-                    'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
-                    'amount'=>$amount, 'currency'=>$currency]);
+                /**
+                 * Two cases are handled below:
+                 * first-time subscription payment: in this case, there will already be a Payment instance in database created during
+                 *      checkout process but its transaction_id will be empty. In that case, we pick payment id from meta data and update
+                 *      the same entry for its payment_intent id.
+                 * recurring payment: in this case, transaction_id of the above payment instance will not be empty, so we create a new entry in
+                 *       payment table with different transaction_id
+                 */
+                if($payment){
+                    if($payment->transaction_id){
+                        \Log::info('creating new transaction entry');
+
+                        $this->paymentGateway->payments()->create(['status'=> $paymentStatus,
+                            'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+                            'amount'=>$amount, 'currency'=>$currency]);
+                    } else {
+                        \Log::info('updating the same transaction');
+                        $payment->update(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId, 'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+                            'amount'=>$amount, 'currency'=>$currency]);
+                    }
+                }
 
                 \Log::info('payment updated successfully');
 
