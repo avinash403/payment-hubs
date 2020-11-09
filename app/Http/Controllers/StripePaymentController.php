@@ -303,72 +303,62 @@ class StripePaymentController extends Controller
     public function webhookListener($appId, Request $request)
     {
         try {
-            \Log::info('webhook received');
+            \Log::info('stripe webhook received');
+            \Log::info(json_encode($request->all()));
 
             $this->setPaymentGateway($appId);
 
-            // stripe only worked with raw payload
-            $payload = @file_get_contents('php://input');
+            if($event = $this->getEventIfValidSignature($request)){
+                if(in_array($event->type, ['invoice.payment_succeeded', 'invoice.payment_failed'])){
 
-            // test
-            $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), 'whsec_2kbnrTkjr5zMLKmYg4FZ3if632SjNoCg');
+                    $data = $event->data;
 
-            // live
-//            $event = Webhook::constructEvent($payload, $request->header('Stripe-Signature'), $this->paymentGateway->webhook_secret);
+                    $customerId = $data['object']['customer'];
 
-            \Log::info('webhook verification passed');
+                    $paymentIntentId = $data['object']['payment_intent'];
 
-            \Log::info(json_encode($request->all()));
+                    $amount = $data['object']['amount_paid']/100;
 
-            if(in_array($event->type, ['invoice.payment_succeeded', 'invoice.payment_failed'])){
+                    $currency = $data['object']['currency'];
 
-                $data = $event->data;
+                    $subscriptionId = $data['object']['subscription'];
 
-                $customerId = $data['object']['customer'];
+                    $customer = Customer::retrieve($customerId);
 
-                $paymentIntentId = $data['object']['payment_intent'];
+                    $subscription = Subscription::retrieve($subscriptionId);
 
-                $amount = $data['object']['amount_paid']/100;
+                    $paymentId = isset($subscription->metadata['payment_id']) ? $subscription->metadata['payment_id'] : null;
 
-                $currency = $data['object']['currency'];
+                    $payment = Payment::find($paymentId);
 
-                $subscriptionId = $data['object']['subscription'];
+                    $paymentStatus = $this->getStatusOutOfEventName($event->type);
 
-                $customer = Customer::retrieve($customerId);
+                    /**
+                     * Two cases are handled below:
+                     * first-time subscription payment: in this case, there will already be a Payment instance in database created during
+                     *      checkout process but its transaction_id will be empty. In that case, we pick payment id from meta data and update
+                     *      the same entry for its payment_intent id.
+                     * recurring payment: in this case, transaction_id of the above payment instance will not be empty, so we create a new entry in
+                     *       payment table with different transaction_id
+                     */
+                    if($payment){
+                        if($payment->transaction_id){
+                            \Log::info('creating new transaction entry');
 
-                $subscription = Subscription::retrieve($subscriptionId);
-
-                $paymentId = isset($subscription->metadata['payment_id']) ? $subscription->metadata['payment_id'] : null;
-
-                $payment = Payment::find($paymentId);
-
-                $paymentStatus = $event->type === "invoice.payment_succeeded" ? 'COMPLETED' : 'DENIED';
-
-                /**
-                 * Two cases are handled below:
-                 * first-time subscription payment: in this case, there will already be a Payment instance in database created during
-                 *      checkout process but its transaction_id will be empty. In that case, we pick payment id from meta data and update
-                 *      the same entry for its payment_intent id.
-                 * recurring payment: in this case, transaction_id of the above payment instance will not be empty, so we create a new entry in
-                 *       payment table with different transaction_id
-                 */
-                if($payment){
-                    if($payment->transaction_id){
-                        \Log::info('creating new transaction entry');
-
-                        $this->paymentGateway->payments()->create(['status'=> $paymentStatus,
-                            'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
-                            'amount'=>$amount, 'currency'=>$currency]);
-                    } else {
-                        \Log::info('updating the same transaction');
-                        $payment->update(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId, 'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
-                            'amount'=>$amount, 'currency'=>$currency]);
+                            $this->paymentGateway->payments()->create(['status'=> $paymentStatus,
+                                'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+                                'amount'=>$amount, 'currency'=>$currency]);
+                        } else {
+                            \Log::info('updating the same transaction');
+                            $payment->update(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId, 'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
+                                'amount'=>$amount, 'currency'=>$currency]);
+                        }
                     }
+
+                    \Log::info('payment updated successfully');
+
+                    return response()->json('payment recorded successfully');
                 }
-
-                \Log::info('payment updated successfully');
-
-                return response()->json('payment recorded successfully');
             }
 
             return response()->json('event ignored');
@@ -386,4 +376,32 @@ class StripePaymentController extends Controller
             return response()->json('event ignored');
         }
     }
+
+    /**
+     * Gives webhook event if signature is valid
+     * @param $request
+     * @return \Stripe\Event
+     * @throws SignatureVerificationException
+     */
+    private function getEventIfValidSignature($request)
+    {
+        $payload = @file_get_contents('php://input');
+
+        // live
+//        return Webhook::constructEvent($payload, $request->header('Stripe-Signature'), $this->paymentGateway->webhook_secret);
+
+        // test
+        return Webhook::constructEvent($payload, $request->header('Stripe-Signature'), 'whsec_2kbnrTkjr5zMLKmYg4FZ3if632SjNoCg');
+    }
+
+    /**
+     * Gets status by event names
+     * @param string $eventName
+     * @return string
+     */
+    private function getStatusOutOfEventName(string $eventName)
+    {
+        return $eventName === "invoice.payment_succeeded" ? 'COMPLETED' : 'DENIED';
+    }
+
 }

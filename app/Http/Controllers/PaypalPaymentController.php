@@ -14,6 +14,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use PayPal\Api\VerifyWebhookSignature;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Refund;
@@ -318,11 +319,9 @@ class PaypalPaymentController extends Controller
 
         $payment->session_id = $subscriptionId;
 
-        // in case of direct payments, amount confirmation is needed. In case of subscriptions, it is already validated
-        if (isset($response->shipping_amount)){
-            $payment->amount = (int)$response->shipping_amount->value;
-            $payment->currency = strtolower($response->shipping_amount->currency_code);
-        }
+        // in case of direct payments, amount confirmation is needed.
+        // In case of subscriptions, it is already validated using plan ID
+
         $payment->save();
     }
 
@@ -538,7 +537,6 @@ class PaypalPaymentController extends Controller
         $payment->save();
     }
 
-
     /**
      * Listens for paypal events and update status and transaction ids
      * @param string $appId
@@ -547,39 +545,86 @@ class PaypalPaymentController extends Controller
      */
     public function webhookListener(string $appId, Request $request)
     {
-        \Log::info('webhook recieved');
+        \Log::info('paypal webhook received');
+
         \Log::info(json_encode($request->all()));
 
         $this->setPaymentGateway($appId);
 
-        // request signature just doesn't work with paypal
-        // $this->getEventIfValidSignature($request);
+        try{
+            if($event = $this->getEventIfValidSignature($request)) {
+                if (in_array($event->event_type, self::WEBHOOK_EVENTS)) {
 
-        // signature verification
-        if (in_array($request->event_type, self::WEBHOOK_EVENTS)) {
+                    /**
+                     * In case of recurring payment, resource.billing_agreement_id is the session identifier
+                     * and in case of one-time payment resource.id is the session identifier
+                     */
+                    if(isset($event->resource['billing_agreement_id'])){
+                        $sessionId = $event->resource['billing_agreement_id'];
+                        $transactionId = $event->resource['id'];
+                    } else {
+                        $sessionId = $event->resource['id'];
+                        $transactionId = $event->resource['id'];
+                    }
 
-            /**
-             * In case of recurring payment, resource.billing_agreement_id is the session identifier
-             * and in case of one-time payment resource.id is the session identifier
-             */
-            if(isset($request->resource['billing_agreement_id'])){
-                $sessionId = $request->resource['billing_agreement_id'];
-                $transactionId = $request->resource['id'];
-            } else {
-                $sessionId = $request->resource['id'];
-                $transactionId = $request->resource['id'];
+                    if($payment = Payment::where('session_id', $sessionId)->first()){
+                        $payment->transaction_id = $transactionId;
+                        $payment->status = $this->getStatusOutOfEventName($event->event_type);
+                        $payment->save();
+                    }
+
+                    \Log::info('payment updated successfully');
+                    return response()->json('payment recorded successfully');
+                }
+                return response()->json('event ignored');
             }
+        } catch (InvalidSignatureException $e){
+            \Log::error('signaure failed');
+            \Log::error($e->getMessage());
+            return response()->json('signature verification failed', 400);
+        } catch (\Exception $e){
+            \Log::error('error encountered');
+            \Log::error($e->getMessage());
+            \Log::error($e->getLine());
+            \Log::error($e->getFile());
+            \Log::error($e->getTraceAsString());
+            return response()->json('event ignored');
+        }
+    }
 
-            \Log::info(json_encode($sessionId));
-            \Log::info(json_encode($transactionId));
-            if($payment = Payment::where('session_id', $sessionId)->first()){
-                \Log::info('session_id met');
-                \Log::info(json_encode($payment));
+    /**
+     * Verifies request signature and return the event if legit request
+     * @param Request $request
+     * @throws GuzzleException
+     * @see https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature_post
+     */
+    private function getEventIfValidSignature(Request $request)
+    {
+        $accessToken = $this->getAccessToken($this->paymentGateway->app_id, $this->paymentGateway->app_secret);
 
-                $payment->transaction_id = $transactionId;
-                $payment->status = $this->getStatusOutOfEventName($request->event_type);
-                $payment->save();
-            }
+        $json = [
+            'auth_algo'=> $request->header('Paypal-Auth-Algo'),
+            'cert_url'=> $request->header('Paypal-Cert-Url'),
+            'transmission_id'=> $request->header('Paypal-Transmission-Id'),
+            'transmission_sig'=> $request->header('Paypal-Transmission-Sig'),
+            'transmission_time'=> $request->header('Paypal-Transmission-Time'),
+            'webhook_id'=> $this->paymentGateway->webhook_secret,
+            'webhook_event'=> json_decode(file_get_contents('php://input'))
+        ];
+
+        // GROW UP PAYPAL. THIS IS INSANE
+        $response = $this->client->post($this->baseUrl . '/v1/notifications/verify-webhook-signature', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ], 'json'=> $json
+            ]
+        );
+
+        if(json_decode($response->getBody()->getContents())->verification_status === 'SUCCESS'){
+            return $request;
+        } else {
+            throw new InvalidSignatureException();
         }
     }
 
@@ -609,59 +654,6 @@ class PaypalPaymentController extends Controller
 
             default:
                 return 'PENDING';
-        }
-    }
-
-    /**
-     * Verifies request signature and return the event if legit request
-     * @param Request $request
-     * @throws GuzzleException
-     */
-    private function getEventIfValidSignature(Request $request)
-    {
-        try {
-            $accessToken = $this->getAccessToken($this->paymentGateway->app_id, $this->paymentGateway->app_secret);
-
-            //            \Log::info($request->header('Paypal-Auth-Algo'));
-//            \Log::info($request->header('Paypal-Cert-Url'));
-//            \Log::info($request->header('Paypal-Transmission-Sig'));
-//            \Log::info($request->header('Paypal-Transmission-Id'));
-            \Log::info(json_encode(file_get_contents('php://input')));
-//            \Log::info($this->paymentGateway->webhook_secret);
-
-
-            $json = [
-                'auth_algo'=> $request->header('Paypal-Auth-Algo'),
-                'cert_url'=> $request->header('Paypal-Cert-Url'),
-                'transmission_id'=> $request->header('Paypal-Transmission-Id'),
-                'transmission_sig'=> $request->header('Paypal-Transmission-Sig'),
-                'transmission_time'=> $request->header('Paypal-Transmission-Time'),
-                'webhook_id'=> $this->paymentGateway->webhook_secret,
-                'webhook_event'=> file_get_contents('php://input')
-            ];
-
-            \Log::info(json_encode($json));
-
-            // GROW UP PAYPAL. THIS IS INSANE
-            $response = $this->client->post($this->baseUrl . '/v1/notifications/verify-webhook-signature', [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . $accessToken,
-                    ],
-                    'json'=> $json
-                ]
-            );
-
-            $response = $response->getBody()->getContents();
-            \Log::info($response);
-            die;
-
-        } catch (RequestException $e) {
-            \Log::error('error occured');
-            \Log::error($e->getMessage());
-            \Log::error($e->getLine());
-            \Log::error($e->getFile());
-            \Log::error($e->getTraceAsString());
         }
     }
 }
