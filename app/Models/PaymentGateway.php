@@ -97,15 +97,7 @@ class PaymentGateway extends Model
      */
     public function getWidgetCodeAttribute()
     {
-        switch ($this->type->name){
-            case 'Stripe':
-                return htmlentities(view('injectable-code', ['url'=> route('payment.stripe.view', $this->app_id)])->render());
-
-            case 'Paypal':
-                return htmlentities(view('injectable-code', ['url'=> route('payment.paypal.view', $this->app_id)])->render());
-
-            default:
-                throw new Exception("Payment Gateway {$this->type->name} not support");
-        }
+        return htmlentities(view('injectable-code', ['appId'=> $this->app_id, 'type'=> $this->type->name])
+            ->render());
     }
 }

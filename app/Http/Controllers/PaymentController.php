@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 
 
 use App\Models\Payment;
+use App\Models\PaymentGateway;
 use Exception;
+use Illuminate\Http\Request;
+use Session;
 
 class PaymentController extends Controller
 {
@@ -55,5 +58,25 @@ class PaymentController extends Controller
         } catch (Exception $e){
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    public function donate(Request $request)
+    {
+        $previousUrl = url()->previous();
+
+        Session::put('source_url', $previousUrl);
+
+        // check the type of the appId
+        if ($paymentGateway = PaymentGateway::where('app_id', $request->input('app_id'))->first()) {
+            if($paymentGateway->type->name === 'Stripe'){
+                return redirect(route('payment.stripe.view', $paymentGateway->app_id));
+            }
+
+            if($paymentGateway->type->name === 'Paypal'){
+                return redirect(route('payment.paypal.view', $paymentGateway->app_id));
+            }
+        }
+
+        return redirect('404');
     }
 }

@@ -1,11 +1,8 @@
-<script>
-    (function(){
-        let iframe = document.createElement('iframe');
-        iframe.setAttribute('src', '{{$url}}');
-        iframe.setAttribute('width', '100%');
-        iframe.setAttribute('height', '500px');
-        iframe.setAttribute('frameBorder', 0);
-        let body = document.getElementsByTagName('body')[0];
-        body.append(iframe);
-    }).call();
-</script>
+<form action="{!! route('payments.donate') !!}" method="post" style="border: none">
+    <input type="hidden" name="app_id" value="{!! $appId !!}">
+    @if($type === 'Paypal')
+        <input type="image" name="submit" src="{!! url('images/donate-button-paypal.png') !!}" width="300" height="160">
+    @else
+        <input type="image" name="submit" src="{!! url('images/donate-button-stripe.png') !!}" width="400" height="160">
+    @endif
+</form>

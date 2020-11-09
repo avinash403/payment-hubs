@@ -27,6 +27,9 @@ Route::get('widget-code/{appId}', [PaymentGatewayController::class, 'getWidgetCo
 Route::get('payments', [PaymentController::class, 'index'])->name('payments');
 Route::post('refund/{paymentId}', [PaymentController::class, 'refund'])->name('payment.refund');
 
+Route::post('donate', [PaymentController::class, 'donate'])->name('payments.donate');
+
+
 Route::get('stripe/{appId}', [StripePaymentController::class, 'create'])->name('payment.stripe.view');
 Route::post('stripe/{appId}/checkout-session', [StripePaymentController::class, 'createCheckoutSession'])->name('payment.stripe.session');
 Route::get('stripe/{appId}/payment-status', [StripePaymentController::class, 'paymentStatus'])->name('payment.stripe.status');

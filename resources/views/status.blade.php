@@ -33,5 +33,13 @@
             </div>
         @endif
     </div>
+
+    <script>
+        setTimeout(() => {
+            @if($sourceUrl = Session::pull('source_url'))
+                window.location.href = '{!! $sourceUrl !!}';
+            @endif
+        }, 3000);
+    </script>
 @endsection
 
