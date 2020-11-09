@@ -49,7 +49,7 @@
                     </td>
 
                     <td>
-                        @if($payment->status === 'SUCCESS')
+                        @if($payment->status === 'COMPLETED')
                             {!! Form::open(['route'=>['payment.refund', $payment->id], 'method'=>'post']) !!}
                                 <button type="submit" class="btn btn-primary">Refund</button>
                             {!! Form::close() !!}

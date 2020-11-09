@@ -7,14 +7,22 @@ use App\Models\PaymentGateway;
 use Crypt;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use PayPal\Api\VerifyWebhookSignature;
+use Stripe\Exception\ApiErrorException;
+use Stripe\Refund;
 
 class PaypalPaymentController extends Controller
 {
+    /**
+     * @var PaymentGateway
+     */
     private $paymentGateway;
 
     const PRODUCT_NAME = 'Hiba-box';
@@ -22,6 +30,17 @@ class PaypalPaymentController extends Controller
     const CURRENCY = 'gbp';
 
     const CURRENCY_SYMBOL = '£';
+
+    /**
+     * events which webhook need to listen to
+     * @internal payment.sale is for recurring payments and payment.capture is for one-time payments
+     */
+    const WEBHOOK_EVENTS = [
+        'PAYMENT.SALE.COMPLETED', 'PAYMENT.SALE.DENIED', 'PAYMENT.SALE.PENDING',
+        'PAYMENT.SALE.REFUNDED', 'PAYMENT.SALE.REVERSED',
+        'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.PENDING',
+        'PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.CAPTURE.REVERSED'
+    ];
 
     /**
      * Base url to paypal server
@@ -51,17 +70,24 @@ class PaypalPaymentController extends Controller
     {
         if ($request->input('payment_id')) {
             $paymentId = Crypt::decryptString($request->input('payment_id'));
-            $this->updatePayment($appId, $request->input('transaction_id'), $paymentId);
             $payment = Payment::find($paymentId);
-
-            if ($request->input('success')) {
-                $payment->update(['status' => 'SUCCESS', 'transaction_id' => $request->input('transaction_id')]);
-                return redirect(route('payment.success'));
-            }
+            $this->setPaymentGateway($appId);
+            $accessToken = $this->getAccessToken($appId, $this->paymentGateway->app_secret);
 
             if ($request->input('error')) {
-                $payment->update(['status' => 'FAILED', 'transaction_id' => $request->input('transaction_id')]);
+                // need a check for non-empty session_id to avoid url manipulation hacks
+                $payment->update(['status' => 'FAILED']);
                 return redirect(route('payment.failed'));
+            }
+
+            if($payment->frequency === 'monthly'){
+                $this->updateMonthlyPayment($accessToken, $request->input('session_id'), $paymentId);
+            } else {
+                $this->updateOneTimePayment($accessToken, $request->input('session_id'), $paymentId);
+            }
+
+            if ($request->input('success')) {
+                return redirect(route('payment.success'));
             }
         }
 
@@ -229,20 +255,16 @@ class PaypalPaymentController extends Controller
     }
 
     /**
-     * Gets product with default name. If doesn't exist, it creates one
-     * @param string $appId
-     * @param string $transactionId
-     * @param integer $paymemtId
+     * Updates user/payment details in one time payment
+     * @param string $accessToken
+     * @param string $orderId
+     * @param string $paymentId
      * @return mixed
      * @throws GuzzleException
      */
-    private function updatePayment($appId, $transactionId, $paymemtId)
+    private function updateOneTimePayment(string $accessToken, string $orderId, string $paymentId)
     {
-        $this->setPaymentGateway($appId);
-
-        $accessToken = $this->getAccessToken($appId, $this->paymentGateway->app_secret);
-
-        $response = $this->client->get($this->baseUrl . '/v2/checkout/orders/'.$transactionId, [
+        $response = $this->client->get($this->baseUrl . '/v2/checkout/orders/'.$orderId, [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $accessToken
@@ -251,23 +273,55 @@ class PaypalPaymentController extends Controller
 
         $response = json_decode($response->getBody()->getContents());
 
-        $payment = Payment::find($paymemtId);
+        $payment = Payment::find($paymentId);
 
         if(isset($response->payer)){
             $payment->customer_name = $response->payer->name->given_name. ' '.$response->payer->name->surname;
             $payment->customer_email = $response->payer->email_address;
         }
 
-        $payment->transaction_id = $transactionId;
-
-            // updating with the latest details to avoid client side manipulations
-        // at server side while plan creation
-        $payment->status = $response->status;
 
         // in case of direct payments, amount confirmation is needed. In case of subscriptions, it is already validated
         if (isset($response->purchase_units[0])){
+            // order is placed as a single product with donation amount, with single transaction
+            $payment->session_id = $response->purchase_units[0]->payments->captures[0]->id;;
             $payment->amount = (int)$response->purchase_units[0]->amount->value;
             $payment->currency = strtolower($response->purchase_units[0]->amount->currency_code);
+        }
+        $payment->save();
+    }
+
+    /**
+     * Updates user/payment details in monthly payment
+     * @param string $accessToken
+     * @param string $subscriptionId
+     * @param string $paymentId
+     * @throws GuzzleException
+     */
+    private function updateMonthlyPayment(string $accessToken, string $subscriptionId, string $paymentId)
+    {
+        $response = $this->client->get($this->baseUrl . '/v1/billing/subscriptions/'.$subscriptionId, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken
+            ]
+        ]);
+
+        $response = json_decode($response->getBody()->getContents());
+
+        $payment = Payment::find($paymentId);
+
+        if(isset($response->subscriber)){
+            $payment->customer_name = $response->subscriber->name->given_name. ' '.$response->subscriber->name->surname;
+            $payment->customer_email = $response->subscriber->email_address;
+        }
+
+        $payment->session_id = $subscriptionId;
+
+        // in case of direct payments, amount confirmation is needed. In case of subscriptions, it is already validated
+        if (isset($response->shipping_amount)){
+            $payment->amount = (int)$response->shipping_amount->value;
+            $payment->currency = strtolower($response->shipping_amount->currency_code);
         }
         $payment->save();
     }
@@ -406,6 +460,13 @@ class PaypalPaymentController extends Controller
         $webhookUrl = route('payment.paypal.webhook-listener', $appId);
 
         if(!($webhook = $this->getWebHook($webhookUrl, $accessToken))){
+
+            $eventTypes = [];
+
+            foreach (self::WEBHOOK_EVENTS as $webhookEvent){
+                array_push($eventTypes, ['name'=>$webhookEvent]);
+            }
+
             $response = $this->client->post($this->baseUrl . '/v1/notifications/webhooks', [
                     'headers' => [
                         'Content-Type' => 'application/json',
@@ -413,10 +474,7 @@ class PaypalPaymentController extends Controller
                     ],
                     'json' => [
                         'url'=> route('payment.paypal.webhook-listener', $appId),
-                        'event_types'=> [
-                            ['name'=> 'PAYMENT.SALE.COMPLETED'],
-                            ['name'=> 'PAYMENT.SALE.DENIED']
-                        ]
+                        'event_types'=> $eventTypes
                     ]
                 ]
             );
@@ -452,25 +510,158 @@ class PaypalPaymentController extends Controller
         }
     }
 
-    public function webhookListener($appId, Request $request)
+
+    /**
+     * Initiates a refund
+     * @param Payment $payment
+     * @throws ApiErrorException
+     * @throws \Exception
+     */
+    public function refund(Payment $payment)
     {
+        $appId = $payment->gateway->app_id;
+
         $this->setPaymentGateway($appId);
 
+        $accessToken = $this->getAccessToken($appId, $this->paymentGateway->app_secret);
+
+        $this->client->post($this->baseUrl . "/v2/payments/captures/{$payment->transaction_id}/refund", [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ]
+            ]
+        );
+
+        $payment->status = 'REFUNDED';
+
+        $payment->save();
+    }
+
+
+    /**
+     * Listens for paypal events and update status and transaction ids
+     * @param string $appId
+     * @param Request $request
+     * @throws GuzzleException
+     */
+    public function webhookListener(string $appId, Request $request)
+    {
+        \Log::info('webhook recieved');
+        \Log::info(json_encode($request->all()));
+
+        $this->setPaymentGateway($appId);
+
+        // request signature just doesn't work with paypal
+        // $this->getEventIfValidSignature($request);
+
         // signature verification
-        if (in_array($request->event_type, ['PAYMENT.SALE.COMPLETED', 'PAYMENT.SALE.DENIED'])){
-            try {
+        if (in_array($request->event_type, self::WEBHOOK_EVENTS)) {
 
-//                $this->paymentGateway->create();
-
-
-
-//                $this->paymentGateway->payments()->create(['status'=> $paymentStatus, 'transaction_id'=> $paymentIntentId,
-//                    'customer_email'=> $customer->email, 'customer_name'=> $customer->name, 'frequency'=>'monthly',
-//                    'amount'=>$amount, 'currency'=>$currency]);
-
-            }catch (Exception $e){
-
+            /**
+             * In case of recurring payment, resource.billing_agreement_id is the session identifier
+             * and in case of one-time payment resource.id is the session identifier
+             */
+            if(isset($request->resource['billing_agreement_id'])){
+                $sessionId = $request->resource['billing_agreement_id'];
+                $transactionId = $request->resource['id'];
+            } else {
+                $sessionId = $request->resource['id'];
+                $transactionId = $request->resource['id'];
             }
+
+            \Log::info(json_encode($sessionId));
+            \Log::info(json_encode($transactionId));
+            if($payment = Payment::where('session_id', $sessionId)->first()){
+                \Log::info('session_id met');
+                \Log::info(json_encode($payment));
+
+                $payment->transaction_id = $transactionId;
+                $payment->status = $this->getStatusOutOfEventName($request->event_type);
+                $payment->save();
+            }
+        }
+    }
+
+    /**
+     * Gets status out of event name
+     * @param string $eventName
+     * @return string
+     */
+    private function getStatusOutOfEventName(string $eventName)
+    {
+        switch ($eventName){
+            case 'PAYMENT.SALE.COMPLETED':
+            case 'PAYMENT.CAPTURE.COMPLETED':
+                return 'COMPLETED';
+
+            case 'PAYMENT.SALE.DENIED':
+            case 'PAYMENT.CAPTURE.DENIED':
+                return 'DENIED';
+
+            case 'PAYMENT.SALE.REFUNDED':
+            case 'PAYMENT.CAPTURE.REFUNDED':
+                return 'REFUNDED';
+
+            case 'PAYMENT.SALE.REVERSED':
+            case 'PAYMENT.CAPTURE.REVERSED':
+                return 'REVERSED';
+
+            default:
+                return 'PENDING';
+        }
+    }
+
+    /**
+     * Verifies request signature and return the event if legit request
+     * @param Request $request
+     * @throws GuzzleException
+     */
+    private function getEventIfValidSignature(Request $request)
+    {
+        try {
+            $accessToken = $this->getAccessToken($this->paymentGateway->app_id, $this->paymentGateway->app_secret);
+
+            //            \Log::info($request->header('Paypal-Auth-Algo'));
+//            \Log::info($request->header('Paypal-Cert-Url'));
+//            \Log::info($request->header('Paypal-Transmission-Sig'));
+//            \Log::info($request->header('Paypal-Transmission-Id'));
+            \Log::info(json_encode(file_get_contents('php://input')));
+//            \Log::info($this->paymentGateway->webhook_secret);
+
+
+            $json = [
+                'auth_algo'=> $request->header('Paypal-Auth-Algo'),
+                'cert_url'=> $request->header('Paypal-Cert-Url'),
+                'transmission_id'=> $request->header('Paypal-Transmission-Id'),
+                'transmission_sig'=> $request->header('Paypal-Transmission-Sig'),
+                'transmission_time'=> $request->header('Paypal-Transmission-Time'),
+                'webhook_id'=> $this->paymentGateway->webhook_secret,
+                'webhook_event'=> file_get_contents('php://input')
+            ];
+
+            \Log::info(json_encode($json));
+
+            // GROW UP PAYPAL. THIS IS INSANE
+            $response = $this->client->post($this->baseUrl . '/v1/notifications/verify-webhook-signature', [
+                    'headers' => [
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . $accessToken,
+                    ],
+                    'json'=> $json
+                ]
+            );
+
+            $response = $response->getBody()->getContents();
+            \Log::info($response);
+            die;
+
+        } catch (RequestException $e) {
+            \Log::error('error occured');
+            \Log::error($e->getMessage());
+            \Log::error($e->getLine());
+            \Log::error($e->getFile());
+            \Log::error($e->getTraceAsString());
         }
     }
 }

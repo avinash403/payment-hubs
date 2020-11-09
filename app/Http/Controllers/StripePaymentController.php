@@ -107,13 +107,13 @@ class StripePaymentController extends Controller
              */
             if ($session->payment_status === 'paid') {
                 $session->payment_intent && $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
-                    ->update(['status'=> 'SUCCESS', 'transaction_id'=> $session->payment_intent,
+                    ->update(['status'=> 'COMPLETED', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.success'));
             } else {
                 $session->payment_intent && $this->paymentGateway->payments()->where('session_id', $request->input('session_id'))
-                    ->update(['status'=> 'FAILED', 'transaction_id'=> $session->payment_intent,
+                    ->update(['status'=> 'DENIED', 'transaction_id'=> $session->payment_intent,
                         'customer_email'=> $customer->email, 'customer_name'=> $customer->name]);
 
                 return redirect(route('payment.failed'));
@@ -342,7 +342,7 @@ class StripePaymentController extends Controller
 
                 $payment = Payment::find($paymentId);
 
-                $paymentStatus = $event->type === "invoice.payment_succeeded" ? 'SUCCESS' : 'FAILED';
+                $paymentStatus = $event->type === "invoice.payment_succeeded" ? 'COMPLETED' : 'DENIED';
 
                 /**
                  * Two cases are handled below:

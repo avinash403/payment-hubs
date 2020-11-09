@@ -38,8 +38,8 @@ class PaymentController extends Controller
                 throw new Exception('Payment Id not found');
             }
 
-            if($payment->status !== 'SUCCESS'){
-                throw new Exception('Only successful payments can be refunded');
+            if($payment->status !== 'COMPLETED'){
+                throw new Exception('Only completed payments can be refunded');
             }
 
             if($payment->gateway->type->name === 'Stripe'){
@@ -47,7 +47,7 @@ class PaymentController extends Controller
             }
 
             if($payment->gateway->type->name === 'Paypal'){
-                // paypal refund
+                (new PaypalPaymentController())->refund($payment);
             }
 
             return redirect()->back()->with('success', 'Refund initiated successfully');

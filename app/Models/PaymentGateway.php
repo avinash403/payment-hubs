@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
  * App\Models\PaymentGateway
  *
  * @property int $id
- * @property string $app_key
  * @property string $app_secret
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at

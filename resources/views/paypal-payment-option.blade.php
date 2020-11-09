@@ -16,60 +16,42 @@
     @endif
     <div id="paypal-button-container"></div>
 
-    @if($planId)
-        <script>
-            paypal.Buttons({
-                createSubscription: function (data, actions) {
-                    return actions.subscription.create({
-                        'plan_id': '{!! $planId !!}'
-                    });
-                },
 
-                onApprove: function (data, actions) {
-                    console.debug('onApprove', data, actions)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?success=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                },
+    <script>
+        let paypalOptions = {};
 
-                onError: function (err) {
-                    console.debug('onError', err)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                },
-                onCancel: function (data) {
-                    console.debug('onCancel', data)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                }
-            }).render('#paypal-button-container');
-        </script>
+        paypalOptions.onError = (err) => {
+            window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}';
+        }
 
-    @else
-        <script>
-            paypal.Buttons({
+        paypalOptions.onCancel = (data) => {
+            window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}';
+        }
 
-                createOrder: function (data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: '{!! $amount !!}'
-                            }
-                        }]
-                    });
-                },
+        // if recurring payment (handled by subscription)
+        @if($planId)
 
-                onApprove: function (data, actions) {
-                    console.debug('onApprove', data, actions)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?success=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                },
+            paypalOptions.createSubscription = (data, actions) => actions.subscription.create({
+                plan_id: '{!! $planId !!}'
+            });
 
-                onError: function (err) {
-                    console.debug('onError', err)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                },
-                onCancel: function (data) {
-                    console.debug('onCancel', data)
-                    window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?error=1&payment_id={!! $paymentId !!}&transaction_id=' + data.orderID;
-                }
-            }).render('#paypal-button-container');
-        </script>
-    @endif
+            paypalOptions.onApprove = (data, actions) => {
+                // on subscription creation it redirects to the paypal route with subscriptionId
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?success=1&payment_id={!! $paymentId !!}&session_id=' + data.subscriptionID;
+            }
+
+        @else
+            paypalOptions.createOrder = (data, actions) => actions.order.create({
+                purchase_units: [{ amount: { value: '{!! $amount !!}' }}]
+            });
+
+            paypalOptions.onApprove = (data, actions) => actions.order.capture().then( details => {
+                // on approval it redirects to the paypal route with orderId
+                window.location.href = '{!! route('payment.paypal.view', $appId) !!}' + '?success=1&payment_id={!! $paymentId !!}&session_id=' + data.orderID;
+            });
+        @endif
+
+        paypal.Buttons(paypalOptions).render('#paypal-button-container');
+    </script>
 
 @endsection
